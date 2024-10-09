@@ -52,7 +52,7 @@ Notation " '(' x ':' y ')'" := (cons (prod_of_argsig {| arg_name := x%string; ar
 Notation "a  b" := (app a b)  (in custom koika_types at level 95, a custom koika_types , b custom koika_types, right associativity).
 
 (* Koika_branches *)
-Notation "x '=>' a " := (cons (x,a) nil) (in custom koika_branches at level 60, x custom koika at level 99, a custom koika at level 89).
+Notation "x '=>' a " := (cons (x,a) nil) (in custom koika_branches at level 60, x custom koika at level 99, a custom koika at level 99).
 Notation "arg1 '|' arg2" := (app arg1 arg2) (in custom koika_branches at level 13, arg1 custom koika_branches, arg2 custom koika_branches, format "'[v' arg1 ']' '/' '|'  '[v' arg2 ']'").
 
 (* Koika *)
@@ -97,6 +97,8 @@ Notation "'write1' '(' reg ',' value ')'" :=
 Notation "'if' a 'then' t 'else' f" := (UIf a t f) (in custom koika at level 86, right associativity, format "'[v' 'if'  a '/' 'then'  t '/' 'else'  f ']'").
 Notation "'guard' '(' a ')' " := (UIf (UUnop (UBits1 UNot) a) (UFail (bits_t 0)) (USugar (UConstBits Ob))) (in custom koika at level 86, right associativity, format "'guard' '(' a ')'").
 Notation "'when' a 'do' t " := (UIf a t (USugar (UConstBits Ob))) (in custom koika at level 91, right associativity, format "'[v' 'when'  a '/' 'do'  t '/' ']'").
+Notation "'assert' a 'in' c"          := (UIf a c (USugar (UConstBits Ob))) (in custom koika at level 91, a custom koika at level 200, right associativity, format "'[v' 'assert'  a '/' 'in'  c ']'").
+Notation "'assert' a 'else' b 'in' c" := (UIf a c b                       ) (in custom koika at level 91, a custom koika at level 200, right associativity, format "'[v' 'assert'  a '/' 'else'  b '/' 'in'  c ']'").
 
 Notation "a '&&' b" :=  (UBinop (UBits2 UAnd) a b) (in custom koika at level 80,  right associativity, format "a  '&&'  b").
 Notation "'!' a" := (UUnop (UBits1 UNot) a) (in custom koika at level 75, format "'!' a").
@@ -211,11 +213,11 @@ Notation "'enum' enum_type '{' f '}'" :=
     (in custom koika at level 1, enum_type constr at level 1, f custom koika_var at level 1).
 
 Notation "'match' var 'with' '|' branches 'return' 'default' ':' default 'end'" :=
-  (UBind "__reserved__matchPattern" var (USugar (USwitch (UVar "__reserved__matchPattern") default branches)))
+  (USugar (USwitch var default branches))
     (in custom koika at level 30,
         var custom koika,
         branches custom koika_branches,
-        default custom koika ,
+        default custom koika at level 99,
         format "'match'  var  'with' '/' '[v'  '|'  branches '/' 'return'  'default' ':' default ']' 'end'").
 
 Notation "'#' s" := (USugar (UConstBits s)) (in custom koika at level 98, s constr at level 0, only parsing).

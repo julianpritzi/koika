@@ -154,10 +154,12 @@ Notation "'read1' '(' reg ')' "           := (Read P1 reg)        (in custom koi
 Notation "'write0' '(' reg ',' value ')'" := (Write P0 reg value) (in custom koika_t at level 1, reg constr at level 13, format "'write0' '(' reg ',' value ')'").
 Notation "'write1' '(' reg ',' value ')'" := (Write P1 reg value) (in custom koika_t at level 1, reg constr at level 13, format "'write1' '(' reg ',' value ')'").
 
-Notation "'if' a 'then' t"          := (If a t                                  (Const (tau := unit_t) Ob)) (in custom koika_t at level 86, t custom koika_t at level 86, a custom koika_t at level 200, right associativity, format "'[v' 'if'  a '/' 'then'  t ']'").
-Notation "'if' a 'then' t 'else' f" := (If a t                                  f         ) (in custom koika_t at level 86, t custom koika_t at level 86, a custom koika_t at level 200, right associativity, format "'[v' 'if'  a '/' 'then'  t '/' 'else'  f ']'").
-Notation "'guard' '(' a ')' "       := (If (Unop (Bits1 Not) a) (Fail (unit_t)) (Const Ob)) (in custom koika_t at level 86, right associativity, format "'guard' '(' a ')'").
-Notation "'when' a 'do' t "         := (If a t                                  (Const Ob)) (in custom koika_t at level 91, right associativity, format "'[v' 'when'  a '/' 'do'  t '/' ']'").
+Notation "'if' a 'then' t"            := (If a t                  (Const (tau := unit_t) Ob)) (in custom koika_t at level 86, t custom koika_t at level 89, a custom koika_t at level 200, right associativity, format "'[v' 'if'  a '/' 'then'  t ']'").
+Notation "'if' a 'then' t 'else' f"   := (If a t                                  f         ) (in custom koika_t at level 86, t custom koika_t at level 89, a custom koika_t at level 200, right associativity, format "'[v' 'if'  a '/' 'then'  t '/' 'else'  f ']'").
+Notation "'assert' a 'in' c"          := (If a c                                  (Fail _)  ) (in custom koika_t at level 99, a custom koika_t at level 200, right associativity, format "'[v' 'assert'  a '/' 'in'  c ']'").
+Notation "'assert' a 'else' b 'in' c" := (If a c                                  b         ) (in custom koika_t at level 99, a custom koika_t at level 200, right associativity, format "'[v' 'assert'  a '/' 'else'  b '/' 'in'  c ']'").
+Notation "'guard' '(' a ')' "         := (If (Unop (Bits1 Not) a) (Fail (unit_t)) (Const Ob)) (in custom koika_t at level 86, right associativity, format "'guard' '(' a ')'").
+Notation "'when' a 'do' t "           := (If a t                                  (Const Ob)) (in custom koika_t at level 99, right associativity, format "'[v' 'when'  a '/' 'do'  t '/' ']'").
 
 Notation "'zeroExtend(' a ',' b ')'" := (Unop (Bits1 (ZExtL _ b)) a) (in custom koika_t at level 1, b constr at level 0, format "'zeroExtend(' a ',' b ')'").
 Notation "'sext(' a ',' b ')'"       := (Unop (Bits1 (SExt  _ b)) a) (in custom koika_t at level 1, b constr at level 0, format "'sext(' a ',' b ')'").
@@ -216,6 +218,83 @@ Notation "'fun' nm '()' ':' ret '=>' body" :=
 Notation "'(' x ',' .. ',' y ')'" := (CtxCons (_,_) (x) .. (CtxCons (_,_) (y) CtxEmpty) ..) (in custom koika_t_args, x custom koika_t at level 99, y custom koika_t at level 99).
 Notation "'(' ')'" := (CtxEmpty) (in custom koika_t_args).
 Notation "'()'"    := (CtxEmpty) (in custom koika_t_args).
+
+Module TODO_contrs_arg_lists.
+
+(* Definition create_arg_list
+{argspec : list (string * type)}
+(args : @input argspec) := args.
+
+Arguments create_arg_list argspec args&.
+
+Notation "'::(' x ',' .. ',' y ')'" := (create_arg_list (CtxCons (_,_) (x) .. (CtxCons (_,_) (y) CtxEmpty) ..)).
+
+Lemma nth_error_nil :
+forall A x,
+@nth_error A nil x = None.
+Proof.
+destruct x; reflexivity.
+Defined.
+
+Lemma nth_error_cons_0 :
+forall A el l,
+@nth_error A (el :: l) 0 = Some el.
+Proof.
+reflexivity.
+Defined.
+
+Lemma list_forall_cons {A1 A2 B} {l1 : list A1} {l2 : list A2} {el1 el2} {f : A1 -> B} {g : A2 -> B}:
+(forall x, option_map f (nth_error (el1::l1) x) = option_map g (nth_error (el2::l2) x)) ->
+(forall x, option_map f (nth_error l1 x) = option_map g (nth_error l2 x)).
+Proof.
+intros H x.
+exact (H (S x)).
+Defined.
+
+Fixpoint list_to_context {sig : list (string * type)} (args : list {t : type & t})
+(H : forall x, option_map (fun el => snd el) (nth_error sig x) = option_map (fun el => projT1 el) (nth_error args x))
+{struct sig} : context (fun x => type_denote (snd x)) sig.
+destruct sig as [| s sig'], args as [| a args'].
+- exact (CtxEmpty).
+- specialize (H 0). rewrite nth_error_nil, nth_error_cons_0 in H. unfold option_map in H. inversion H.
+- specialize (H 0). rewrite nth_error_nil, nth_error_cons_0 in H. unfold option_map in H. inversion H.
+- assert (H' := H).
+  specialize (H' 0).
+  simpl in H'.
+  inversion H'.
+  exact (CtxCons s (rew <- H1 in projT2 a) (list_to_context sig' args' (list_forall_cons H))).
+Defined.
+
+Definition list_to_context_test := @list_to_context (times_three.(int_argspec)) [existT _ (bits_t 16 : type) (Bits.of_nat 16 2)] (_).
+
+unfold nth_error in H. unfold option_map in H.
+
+Search (List.nth_error nil _).
+
+unfold option_map in H. unfold nth_error in H.  discriminate.
+
+match sig, args with
+| nil, nil => CtxEmpty
+| nm_t :: sig' => 
+
+
+Class KoikaArgs {sig : list (string * type)} (args : list {t : Type & t}):= koika_args : context (fun x => type_denote (snd x)) sig.
+Hint Extern 1 (KoikaArgs ?sig ?args) => exact (ccreate sig (fun k mem => must (nth_error args (member_idx mem)))) : typeclass_instances.
+Definition test2 : @KoikaArgs times_three.(int_argspec) [existT _ (_ : Type) (Bits.of_nat 16 2)].
+constructor.
+- unfold prod_of_argsig, snd, arg_type.
+  shelve.
+- exact (ccreate (times_three.(int_argspec)) (fun k mem => must (nth_error [Bits.of_nat 16 2] (member_idx mem)) : type_denote (snd k))).
+
+
+Definition test3 := ccreate (times_three.(int_argspec)) (fun k mem => must (nth_error [Bits.of_nat 16 2] (member_idx mem)) : type_denote (snd k)).
+Check test2.
+Compute test2.
+
+Definition test := #{ ("bs", _) => (Bits.of_nat 16 2)) }# : context (fun x => type_denote (snd x)) times_three.(int_argspec).
+Check test. *)
+
+End TODO_contrs_arg_lists.
 
 (*
   Assume you have a function in a Modul:
@@ -283,20 +362,43 @@ Notation "'{' fn '}' args" :=
 
 Notation "'extcall' method '(' arg ')'" := (ExternalCall method arg) (in custom koika_t at level 98, method constr at level 0, arg custom koika_t).
 
-Notation "'get' '(' v ',' f ')'"                    := (fun (v : struct_t sig) => (Unop  (Struct1 GetField _      (must (List_assoc f sig.(struct_fields))))  v  ) v) (in custom koika_t at level 1,                       v custom koika_t at level 13,                             f custom koika_t_var at level 0, format "'get' '(' v ','  f ')'").
 Notation "'getbits' '(' t ',' v ',' f ')'"          := (Unop  (Bits1 (GetFieldBits t   (must (PrimTypeInference.find_field t f)))) v  ) (in custom koika_t at level 1, t constr at level 11, v custom koika_t at level 13,                             f custom koika_t_var at level 0, format "'getbits' '(' t ','  v ','  f ')'").
 Notation "'subst' '(' v ',' f ',' a ')'"            := (Binop (Struct2 SubstField _    (must (PrimTypeInference.find_field _ f)))  v a) (in custom koika_t at level 1,                       v custom koika_t at level 13, a custom koika_t at level 13, f custom koika_t_var at level 0, format "'subst' '(' v ','  f ',' a ')'").
 Notation "'substbits' '(' t ',' v ',' f ',' a ')'"  := (Binop (Bits2 (SubstFieldBits t (must (PrimTypeInference.find_field t f)))) v a) (in custom koika_t at level 1, t constr at level 11, v custom koika_t at level 13, a custom koika_t at level 13, f custom koika_t_var at level 0, format "'substbits' '(' t ','  v ','  f ',' a ')'").
 
 
-Notation must_field sig f :=
-  (must (List_assoc f sig.(struct_fields))).
+(* Notation must_field sig f := *)
+  (* (must (List_assoc f sig.(struct_fields))). *)
 
-Class GetField (sig: struct_sig) (f: string) :=
-  sf_idx : struct_index sig.
+(* Class GetField (sig: struct_sig) (f: string) := *)
+  (* sf_idx : struct_index sig. *)
 
 (* Hint Extern 1 (StructField ?sig ?f) => exact (must_field sig f) : typeclass_instances. *)
 (* Hint Mode StructField + + : typeclass_instances. *)
+
+(* Definition get_field 
+  {var_t reg_t ext_fn_t: Type}
+  {R : reg_t -> type}
+  {Sigma: ext_fn_t -> ExternalSignature}
+  {sig}
+  (v : action (tau := struct_t sig) R Sigma) (f : string) :=
+    let idx_o := List_assoc f sig.(struct_fields) in
+    match idx_o with
+    | Some idx => Unop (Struct1 GetField sig (idx)) v
+    | None => tt
+    end : if (idx_o) then action R Sigma else unit. *)
+
+(* Set Printing Implicit. *)
+(* Check get_field. *)
+
+(* Class StructIdx (sig : struct_sig) (f : string) := field_idx : struct_index sig.
+Hint Extern 1 (StructIdx ?sig ?f) => exact (must (List_assoc f sig.(struct_fields))) : typeclass_instances. *)
+
+(* tau == Compute (@retSig type 1 (PrimSignatures.Sigma1 (Struct1 GetField ?sig x))). *)
+
+(* Notation "'get(' v ',' f ')'" :=
+  ((fun {sig} {var_t reg_t ext_fn_t: Type} {R : reg_t -> type} {Sigma: ext_fn_t -> ExternalSignature}
+  (v' : action' (tau := struct_t sig) R Sigma) => Unop (Struct1 GetField sig (_ : StructIdx sig f)) v') v) (in custom koika_t at level 1, v custom koika_t at level 13, f custom koika_t_var at level 0, format "'get(' v ','  f ')'"). *)
 
 Notation "'get@' sig '(' v ',' f ')'" :=
   (Unop (Struct1 GetField sig (must (List_assoc f sig.(struct_fields)))) v)
@@ -450,7 +552,6 @@ Notation "structtype '::{' fields '}'" :=
   (ltac:(let e := struct_init_from_list structtype fields in exact e) : (struct_t structtype)) (at level 1, structtype constr, fields custom koika_t_struct_init_constr).
 
 
-(* TODO i would like to use different paratesis here *)
 Notation "'enum' sig '::<' f '>'" :=
   (Const (tau := enum_t sig) (vect_nth sig.(enum_bitpatterns) (must (vect_index f sig.(enum_members)))))
     (in custom koika_t at level 1, sig constr at level 0, f custom koika_t_var).
@@ -749,6 +850,12 @@ Module Type Tests2.
     fun idk (num : struct_t numbers_s) : bits_t 1 =>
       get@numbers_s(num, one) == Ob~0~0~1
   }>.
+
+  (* Definition test_get2 : function R Sigma := <{
+    fun idk (num : struct_t numbers_s) : bits_t 1 =>
+      get(num, one) == Ob~0~0~1
+  }>. *)
+
   Definition struct_test_1 := struct numbers_s::{ }.
   Definition struct_test_2 :  struct numbers_s::{ } = value_of_bits Bits.zero := eq_refl.
   Definition struct_test_3 := struct numbers_s::{ one := |"010":b| }.

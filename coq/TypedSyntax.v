@@ -8,6 +8,13 @@ Section Syntax.
   Context {R: reg_t -> type}.
   Context {Sigma: ext_fn_t -> ExternalSignature}.
 
+  (*
+    tau: the type that an expression evaluates to
+      e.g. `Const (Bits.of_nat 5 18)` then tau is `bits_t 5`
+    var_t: the type of identifiers - as far as I know always [string]
+      e.g. in `let a := ... in ...` a is parsed (and stored in the AST) as string
+
+    *)
   Inductive action : tsig var_t -> type -> Type :=
   | Fail {sig} tau : action sig tau
   | Var {sig} {k: var_t} {tau: type}
@@ -48,6 +55,7 @@ Section Syntax.
   | InternalCall {sig tau}
                  (fn : fn_name_t)
                  {argspec : tsig var_t}
+                 (* TODO -- why does this list need to be reversed?? *)
                  (args: context (fun k_tau => action sig (snd k_tau)) (List.rev argspec))
                  (body : action (List.rev argspec) tau)
     : action sig tau

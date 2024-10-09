@@ -1,11 +1,13 @@
-{
-  lib,
-  mkCoqDerivation,
-  coq,
-  boost,
-  python3,
-  sphinx,
-  doCheck ? false,
+{ lib
+, mkCoqDerivation
+, coq
+, boost
+, python3
+, sphinx
+, equations
+  # , coq-unicoq
+, doCheck ? false
+,
 }:
 mkCoqDerivation rec {
   pname = "koika";
@@ -17,10 +19,11 @@ mkCoqDerivation rec {
   release."0.0.1" = {
     src = lib.const (lib.cleanSourceWith {
       src = lib.cleanSource ./.;
-      filter = let
-        inherit (lib) all hasSuffix;
-        ignorePaths = xs: path: all (x: ! hasSuffix x path) xs;
-      in
+      filter =
+        let
+          inherit (lib) all hasSuffix;
+          ignorePaths = xs: path: all (x: ! hasSuffix x path) xs;
+        in
         path: _: ignorePaths (import ./ignored_paths.nix) path;
     });
   };
@@ -45,6 +48,8 @@ mkCoqDerivation rec {
     parsexp
     hashcons
     zarith
+    equations
+    # coq-unicoq
   ];
 
   preInstall = ''

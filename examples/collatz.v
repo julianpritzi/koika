@@ -1,5 +1,21 @@
 (*! Computing terms of the Collatz sequence (Coq version) !*)
 Require Import Koika.Frontend.
+Require Import Koika.TypedParsing.
+
+
+Inductive empty_reg_t := .
+Definition empty_R (reg: empty_reg_t) : type := match reg with end.
+Definition empty_r (reg: empty_reg_t) : type_denote (empty_R reg) := match reg with end.
+
+
+
+Time Definition min {reg_t : Type} {R : reg_t -> type}: function R empty_Sigma :=
+let bit_size := 1000 in
+[[
+fun min (first: bits_t bit_size) (second: bits_t bit_size) : bits_t bit_size =>
+  if first < second then first else second
+]].
+
 
 Module Collatz.
   (*! We have one register ``r0``: !*)
@@ -22,40 +38,39 @@ Module Collatz.
     | r0 => Bits.of_nat sz 18
     end.
 
-  Definition times_three : UInternalFunction reg_t empty_ext_fn_t :=
-    {{ fun times_three (bs: bits_t 16) : bits_t 16 =>
-         (bs << Ob~1) + bs }}.
+  Definition times_three : function R empty_Sigma :=
+    [[ fun times_three (bs: bits_t 16) : bits_t 16 =>
+         (bs << Ob~1) + bs ]].
 
   (*! Our first rule, ``divide``, reads from r0 and halves the result if it's even: !*)
-  Definition _divide : uaction reg_t empty_ext_fn_t :=
-    {{ let v := read0(r0) in
+  Program Definition _divide : action R empty_Sigma :=
+    [[ let v := read0(r0) in
        let odd := v[Ob~0~0~0~0] in
        if !odd then
          write0(r0,v >> Ob~1)
        else
-         fail }}.
+         fail ]].
 
   (*! Our second rule, ``multiply``, reads the output of ``divide`` and
       multiplies it by three and ads one if it is odd: !*)
-  Definition _multiply : uaction reg_t empty_ext_fn_t :=
-    {{ let v := read1(r0) in
+  Program Definition _multiply : action R empty_Sigma :=
+    [[ let v := read1(r0) in
        let odd := v[Ob~0~0~0~0] in
        if odd then
          write1(r0, times_three(v) + Ob~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~1)
        else
-         fail }}.
+         fail ]].
 
   (*! The design's schedule defines the order in which rules should (appear to) run !*)
   Definition collatz : scheduler :=
     divide |> multiply |> done.
 
   (*! Rules are written in an untyped language, so we need to typecheck them: !*)
-  Definition rules :=
-    tc_rules R empty_Sigma
-             (fun r => match r with
-                    | divide => _divide
-                    | multiply => _multiply
-                    end).
+  Definition rules (r : rule_name_t) :=
+    match r with
+    | divide => _divide
+    | multiply => _multiply
+    end.
 
   (*! And now we can compute results: uncomment the ``Print`` commands below to show results. !*)
 
@@ -157,13 +172,13 @@ Module Collatz_Test.
      * For functions, we have to add this boiler plate code.
      * It essentially type checks a function and turns it into an action.
      *)
-    let func := (tc_function R empty_Sigma times_three) in
+    let func := times_three in
     (*
      * Passing the value 2 as input to our function
      *)
     let input := #{ ("bs", bits_t 16) => (Bits.of_nat 16 2) }# in
 
-    run_function r input func
+    run_function r input func.(int_body)
     (fun ctxt out =>
       let r0 := Bits.to_nat ctxt.[r0] in
       let out  := Bits.to_nat out in
