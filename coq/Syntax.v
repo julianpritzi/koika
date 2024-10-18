@@ -35,6 +35,8 @@ Section Syntax.
   | USwitch (var: uaction)
             (default: uaction)
             (branches: list (uaction * uaction))
+  (* | UUnroll (arr : uaction) (a b v: var_t)
+            (reduction : uaction) (body : uaction) *)
   | UStructInit (sig: struct_sig) (fields: list (string * uaction))
   | UArrayInit (tau: type) (elements: list uaction)
   | UCallModule {module_reg_t module_ext_fn_t: Type}

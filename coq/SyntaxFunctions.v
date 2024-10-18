@@ -69,6 +69,8 @@ Section SyntaxFunctions.
              let '(_, branches) :=
                  foldi (fun n '(a1, a2) branches => (r n a1, r (1 + 2 * n) a2) :: branches) 2 [] branches in
              USwitch (r 0 var) (r 1 default) branches
+           (* | UUnroll arr a b v reduction body => *)
+             (* UUnroll (r 0 arr) a b v (r 1 reduction) (r 2 body) *)
            | UStructInit sig fields =>
              let '(_, fields) :=
                  foldi (fun n '(nm, a) fields => (nm, r n a) :: fields) 0 [] fields in

@@ -80,7 +80,7 @@ Notation "'when' a 'do' t "           := (If a t (Const Ob)) (in custom koika_t 
 Notation "'let' a ':=' b 'in' c" := (Bind a b c) (in custom koika_t at level 200, a custom koika_t_var, right associativity, format "'[v' 'let'  a  ':='  b  'in' '/' c ']'").
 
 Notation "a ';' b" := (Seq a b) (in custom koika_t at level 90, format "'[v' a ';' '/' b ']'" ).
-Notation "'set' a ':=' b" := (Assign (_: VarRef a _) b) (in custom koika_t at level 89, a custom koika_t_var, format "set  a  :=  b", only parsing).
+Notation "'set' a ':=' b" := (Assign (_: VarRef a _) b) (in custom koika_t at level 89, a custom koika_t_var, only parsing).
 
 Notation "'if' a 'then' t"            := (If a t                  (Const (tau := unit_t) Ob)) (in custom koika_t at level 89, t custom koika_t at level 89, right associativity, format "'[v' if  a '/' then  t ']'").
 Notation "'if' a 'then' t 'else' f"   := (If a t                  f                         ) (in custom koika_t at level 89, t custom koika_t at level 89, right associativity, format "'[v' if  a '/' then  t '/' else  f ']'").
@@ -437,9 +437,10 @@ Notation "'0'" := (Ob~0) (in custom koika_t_consts at level 0).
 Notation "bs '~' '0'" := (Bits.cons false bs) (in custom koika_t_consts at level 1, left associativity, format "bs '~' '0'").
 Notation "bs '~' '1'" := (Bits.cons  true bs) (in custom koika_t_consts at level 1, left associativity, format "bs '~' '1'").
 
-Notation "'Ob' '~' number" :=
-  (Const (tau := bits_t _) number)
-    (in custom koika_t at level 0, number custom koika_t_consts, format "'Ob' '~' number").
+Notation "'Ob' '~' number" := (Const (tau := bits_t _) number)
+  (in custom koika_t at level 0, number custom koika_t_consts, format "'Ob' '~' number").
+Notation "'Ob'" := (Const (tau := bits_t 0) Ob)
+  (in custom koika_t at level 0, format "'Ob'").
 
 (* koika bit vector literals *)
 From Coq Require BinaryString OctalString HexString HexadecimalString DecimalString.
@@ -468,32 +469,42 @@ Local Definition hex_string_to_N s := (must (num_string_to_option_N s 16 HexStri
 
 Local Definition len := String.length.
 
+(* Bits.of_N with an inferred length or a default if inference fails *)
+Ltac bits_of_N default val :=
+  exact (Bits.of_N default val) + exact (Bits.of_N _ val).
+  (* match goal with
+  | |- bits ?n =>
+    tryif has_evar n
+    then exact (Bits.of_N default val)
+    else exact (Bits.of_N _ val)
+  end. *)
+
 Declare Custom Entry koika_t_literal.
-Notation "num ':b' sz" := (Bits.of_N (sz <: nat)            (bin_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, only parsing).
-Notation "num ':b'"    := (Bits.of_N ((len num) * 1)        (bin_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
-Notation "'0b' num sz" := (Bits.of_N (sz <: nat)            (bin_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, format "'0b' num sz").
-Notation "'0b' num"    := (Bits.of_N ((len num) * 1)        (bin_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
-Notation "'0b' num"    := (Bits.of_N _                      (bin_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, only printing,        format "'0b' num").
+Notation "num ':b' sz" :=      (Bits.of_N (sz <: nat)            (bin_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, only parsing).
+Notation "num ':b'"    := ltac:(bits_of_N ((len num) * 1)        (bin_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
+Notation "'0b' num sz" :=      (Bits.of_N (sz <: nat)            (bin_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, format "'0b' num sz").
+Notation "'0b' num"    := ltac:(bits_of_N ((len num) * 1)        (bin_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
+Notation "'0b' num"    :=      (Bits.of_N _                      (bin_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, only printing,        format "'0b' num").
 
-Notation "num ':o' sz" := (Bits.of_N (sz <: nat)            (oct_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, only parsing).
-Notation "num ':o'"    := (Bits.of_N ((len num) * 3)        (oct_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
-Notation "'0o' num sz" := (Bits.of_N (sz <: nat)            (oct_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, format "'0o' num sz").
-Notation "'0o' num"    := (Bits.of_N ((len num) * 3)        (oct_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
-Notation "'0o' num"    := (Bits.of_N _                      (oct_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, only printing,        format "'0o' num").
+Notation "num ':o' sz" :=      (Bits.of_N (sz <: nat)            (oct_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, only parsing).
+Notation "num ':o'"    := ltac:(bits_of_N ((len num) * 3)        (oct_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
+Notation "'0o' num sz" :=      (Bits.of_N (sz <: nat)            (oct_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, format "'0o' num sz").
+Notation "'0o' num"    := ltac:(bits_of_N ((len num) * 3)        (oct_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
+Notation "'0o' num"    :=      (Bits.of_N _                      (oct_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, only printing,        format "'0o' num").
 
-Notation "num ':d' sz" := (Bits.of_N (sz <: nat)            (dec_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, only parsing).
-Notation "num ':d'"    := (Bits.of_N (1 + (N.to_nat (N.log2 (dec_string_to_N num))))
+Notation "num ':d' sz" :=      (Bits.of_N (sz <: nat)            (dec_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, only parsing).
+Notation "num ':d'"    := ltac:(bits_of_N (1 + (N.to_nat (N.log2 (dec_string_to_N num))))
                                                             (dec_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
-Notation "'0d' num sz" := (Bits.of_N (sz <: nat)            (dec_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, format "'0d' num sz").
-Notation "'0d' num"    := (Bits.of_N (1 + (N.to_nat (N.log2 (dec_string_to_N num))))
+Notation "'0d' num sz" :=      (Bits.of_N (sz <: nat)            (dec_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, format "'0d' num sz").
+Notation "'0d' num"    := ltac:(bits_of_N (1 + (N.to_nat (N.log2 (dec_string_to_N num))))
                                                             (dec_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
-Notation "'0d' num"    := (Bits.of_N _                      (dec_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, only printing,        format "'0d' num").
+Notation "'0d' num"    :=      (Bits.of_N _                      (dec_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, only printing,        format "'0d' num").
 
-Notation "num ':h' sz" := (Bits.of_N (sz <: nat)            (hex_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, only parsing).
-Notation "num ':h'"    := (Bits.of_N ((len num) * 4)        (hex_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
-Notation "'0x' num sz" := (Bits.of_N (sz <: nat)            (hex_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, format "'0x' num sz").
-Notation "'0x' num"    := (Bits.of_N ((len num) * 4)        (hex_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
-Notation "'0x' num"    := (Bits.of_N _                      (hex_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, only printing,        format "'0x' num").
+Notation "num ':h' sz" :=      (Bits.of_N (sz <: nat)            (hex_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, only parsing).
+Notation "num ':h'"    := ltac:(bits_of_N ((len num) * 4)        (hex_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
+Notation "'0x' num sz" :=      (Bits.of_N (sz <: nat)            (hex_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, sz constr at level 0, format "'0x' num sz").
+Notation "'0x' num"    := ltac:(bits_of_N ((len num) * 4)        (hex_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0,                       only parsing).
+Notation "'0x' num"    :=      (Bits.of_N _                      (hex_string_to_N num)) (in custom koika_t_literal at level 0, num constr at level 0, only printing,        format "'0x' num").
 
 (* legacy number format *)
 Notation "a '`d' b" := (Bits.of_N (a<:nat) b%N) (in custom koika_t_literal at level 0, a constr at level 0, b constr at level 0).
@@ -502,6 +513,27 @@ Notation "a '`d' b" := (Bits.of_N (a<:nat) b%N) (in custom koika_t_literal at le
 Notation "'|' literal '|'" := (Const (tau := bits_t _) literal) (in custom koika_t, literal custom koika_t_literal).
 (* literal inside constr (normal Coq) - directly usable as [bits n] *)
 Notation "'|' literal '|'" := (literal) (at level 10, literal custom koika_t_literal).
+
+
+(* Definition test : bits 10 := ltac:(bits_of_N 5 9%N).
+Definition test2 : bits _ := ltac:(bits_of_N 5 9%N).
+Check test.
+
+Definition idk : bits 10 := ltac:(
+  match goal with
+  | |- bits ?n =>
+    tryif has_evar n
+    then exact (Bits.of_nat 5 9)
+    else exact (Bits.of_nat _ 9)
+  end
+  (* match goal with
+  | |- ?n =>
+     else 
+  end *)
+  (* exact (Bits.of_nat  5 5) *)
+  ).
+Check idk. *)
+
 
 
 (* ========================================================================= *)
@@ -693,10 +725,11 @@ Module Type Tests.
       read0(reg1)
   }>.
 
-  Definition test_funcall : function R Sigma := <{
+  Program Definition test_funcall : function R Sigma := <{
     fun f () : bits_t 2 =>
       test_func2(|0b"1"|, |0b"011"|)
   }>.
+  Fail Next Obligation.
 
   Definition numbers_s := {|
     struct_name := "numbers";
@@ -745,7 +778,8 @@ Module Type Tests2.
   Definition test_10 : nat -> action test_R Sigma := (fun idx => <{ read0(rData idx) }>).
   Definition test_11 : _action := <{ (let yoyo := read0(data0) in write0(data0, Ob~1~1~1~1~1)); fail }>.
   Fail Definition test_11' : _action := <{ (let yoyo := read0(data0) in write0(data0, Ob~1~1~1~1)); fail }>.
-  Definition test_12 : _action := <{ (let yoyo := if fail (1) then read0(data0) else fail (5) in write0(data0, |0b"01100"|));fail }>.
+  Program Definition test_12 : _action := <{ (let yoyo := if fail (1) then read0(data0) else fail (5) in write0(data0, |0b"01100"|));fail }>.
+  Fail Next Obligation.
   Fail Definition test_13 : _action := <{ yoyo }>.
   Definition test_14 : _action := <{ !Ob~1 && Ob~1 }>.
   Definition test_14' : _action := <{ !(Ob~1 && Ob~1) }>.

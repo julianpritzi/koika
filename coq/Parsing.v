@@ -41,8 +41,6 @@ Notation "'let' a ':=' b 'in' c" := (UBind a b c) (in custom koika at level 200,
 Notation "a ';' b" := (USeq a                        b) (in custom koika at level 90, b at level 200, format "'[v' a ';' '/' b ']'" ).
 Notation "a ';'"   := (USeq a (USugar (UConstBits Ob))) (in custom koika at level 90). (* trailing comma *)
 
-Print Custom Grammar koika.
-
 
 Notation "'set' a ':=' b" := (UAssign a b) (in custom koika at level 89, a custom koika_var, format "set  a  :=  b").
 
@@ -90,6 +88,7 @@ Notation "a '[' b ':+' c ']'" := (UBinop (UBits2 (UIndexedSlice c)) a b) (in cus
 
 (* get field of struct *)
 Notation "a '.[' f ']'" := (UUnop  (UStruct1 (UGetField f)) a) (in custom koika at level 60, f custom koika_var).
+
 
 Notation "'`' a '`'" := (a) (in custom koika, a constr).
 Notation "'(' a ')'" := (a) (in custom koika, a custom koika, format "'[v' '(' a ')' ']'").
@@ -154,6 +153,10 @@ Notation "bs '~' '1'" := (Bits.cons true bs)  (in custom koika_consts at level 1
 
 Notation "'Ob' '~' number" := (USugar (UConstBits number))
   (in custom koika at level 0, number custom koika_consts, format "'Ob' '~' number").
+Notation "'Ob'"            := (USugar (UConstBits Bits.nil))
+  (in custom koika at level 0).
+
+
 
 (* koika bit vector literals *)
 From Coq Require BinaryString OctalString HexString HexadecimalString DecimalString.
@@ -230,6 +233,7 @@ Notation "'0x' num"    := (let s := filt num in (USugar (UConstBits (Bits.of_N (
 Notation "'0x' num"    := (let s := filt num in (USugar (UConstBits (Bits.of_N _                      (hex_string_to_N s))))) (in custom koika at level 0, num constr at level 0, only printing,        format "'0x' num").
 
 (* legacy number format *)
+(* TODO remove to prevent abiguity with trailing semicolons followed by match branches *)
 Notation "'|' a '`d' b '|'" :=
   (USugar (UConstBits (Bits.of_N (a<:nat) b%N)))
     (in custom koika, a constr at level 0 , b constr at level 0).

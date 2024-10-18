@@ -305,14 +305,6 @@ Definition map_intf_body {var_t fn_name_t action action': Type}
      int_retSig := fn.(int_retSig);
      int_body := f fn.(int_body) |}.
 
-Record arg_sig {var_t} :=
-  { arg_name: var_t;
-    arg_type: type }.
-Arguments arg_sig : clear implicits.
-
-Definition prod_of_argsig {var_t} (a: @arg_sig var_t) :=
-  (a.(arg_name), a.(arg_type)).
-
 (** * Debugging and disambiguation of type names **)
 
 Fixpoint type_id (tau: type) : string :=
