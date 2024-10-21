@@ -1,7 +1,6 @@
 (*! Language | Continuation-passing semantics and weakest precondition calculus !*)
 
 Require Import CompactSemantics.
-Require Import Magic.
 Require Coq.derive.Derive.
 
 Section CPS.
@@ -249,8 +248,7 @@ Section CPS.
     Proof.
       subst interp_action_cps1;
         instantiate (1 := ltac:(intros sig tau L a; destruct a)).
-      intros. destruct a.
-      all: simpl; reflexivity.
+      intros. destruct a; simpl; reflexivity.
     Qed.
   End Action.
 
