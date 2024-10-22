@@ -9,8 +9,6 @@ Import Ltac2.Notations.
 Import Coq.Lists.List.ListNotations.
 Open Scope list.
 
-Locate None.
-
 Ltac2 compute c :=
   Std.eval_vm None c.
 

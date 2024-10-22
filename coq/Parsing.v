@@ -26,10 +26,10 @@ Notation "'(' x ':' y ')'" := (x%string, y : type) (in custom koika_binder at le
 Notation "a .. b" := (cons a ..  (cons b nil) ..)  (in custom koika_binder at level 1, a custom koika_binder at next level, b custom koika_binder at next level).
 
 Notation "'fun' nm args ':' ret '=>' body" :=
-  (Build_InternalFunction nm%string args ret body)
+  (Build_UInternalFunction nm%string args ret body)
     (in custom koika at level 200, nm custom koika_var, args custom koika_binder, ret constr at level 0, right associativity, format "'[v' 'fun'  nm  args  ':'  ret  '=>' '/' body ']'").
 Notation "'fun' nm '()' ':' ret '=>' body" :=
-  (Build_InternalFunction nm%string nil ret body)
+  (Build_UInternalFunction nm%string nil ret body)
     (in custom koika at level 200, nm custom koika_var, ret constr at level 0, right associativity, format "'[v' 'fun'  nm  '()'   ':'  ret  '=>' '/' body ']'").
 
 Notation "'assert' a 'in' c"          := (UIf a c (USugar (UConstBits Ob))) (in custom koika at level 200, right associativity, format "'[v' 'assert'  a '/' 'in'  c ']'").
@@ -376,11 +376,12 @@ Module Type Tests.
   Definition test_20 : uaction reg_t := {{ yoyo [ magic :+ 3 ] && yoyo }}.
   Definition test_20' : uaction reg_t := {{ (yoyo [ magic :+ 3]  ++ yoyo) && yoyo }}.
   Definition test_20'' : uaction reg_t := {{ ( yoyo [ magic :+ 3 ] ++ yoyo ++bla) && yoyo }}.
-
-  Definition test_23 : InternalFunction string string (uaction reg_t) := {{ fun test (arg1 : (bits_t 3)) (arg2 : bits_t 2) : bits_t 4 => magic }}.
-  Definition test_24 : nat -> InternalFunction string string (uaction reg_t) :=  (fun sz => {{ fun test (arg1 : bits_t sz) (arg1 : bits_t sz) : bits_t sz  => magic}}).
-  Definition test_25 : nat -> InternalFunction string string (uaction reg_t) := (fun sz => {{fun test (arg1 : bits_t sz ) : bits_t sz => let oo := magic >> magic in magic}}).
-  Definition test_26 : nat -> InternalFunction string string (uaction reg_t) := (fun sz => {{ fun test () : bits_t sz  => magic }}).
+  Notation UInternalFunction :=
+    (UInternalFunction pos_t string string reg_t ext_fn_t).
+  Definition test_23 : UInternalFunction string string (uaction reg_t) := {{ fun test (arg1 : (bits_t 3)) (arg2 : bits_t 2) : bits_t 4 => magic }}.
+  Definition test_24 : nat -> UInternalFunction string string (uaction reg_t) :=  (fun sz => {{ fun test (arg1 : bits_t sz) (arg1 : bits_t sz) : bits_t sz  => magic}}).
+  Definition test_25 : nat -> UInternalFunction string string (uaction reg_t) := (fun sz => {{fun test (arg1 : bits_t sz ) : bits_t sz => let oo := magic >> magic in magic}}).
+  Definition test_26 : nat -> UInternalFunction string string (uaction reg_t) := (fun sz => {{ fun test () : bits_t sz  => magic }}).
   Definition test_27 : uaction reg_t := {{
     if (!read0(data0)) then
       write0(data0, Ob~1);

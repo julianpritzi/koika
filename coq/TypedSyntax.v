@@ -53,11 +53,10 @@ Section Syntax.
                  (arg: action sig (arg1Sig (Sigma fn)))
     : action sig (retSig (Sigma fn))
   | InternalCall {sig tau}
-                 (fn : fn_name_t)
-                 {argspec : tsig var_t}
                  (* TODO -- why does this list need to be reversed?? *)
+                 (fn : InternalFunction' fn_name_t (action (List.rev argspec) tau))
+                 {argspec : tsig var_t}
                  (args: context (fun k_tau => action sig (snd k_tau)) (List.rev argspec))
-                 (body : action (List.rev argspec) tau)
     : action sig tau
   | APos {sig tau} (pos: pos_t) (a: action sig tau)
     : action sig tau.
@@ -67,3 +66,6 @@ End Syntax.
 
 Arguments action pos_t var_t fn_name_t {reg_t ext_fn_t} R Sigma sig tau : assert.
 Arguments rule pos_t var_t fn_name_t {reg_t ext_fn_t} R Sigma : assert.
+
+Notation InternalFunction pos_t var_t fn_name_t R Sigma sig tau :=
+  (InternalFunction' fn_name_t (action pos_t var_t fn_name_t R Sigma sig tau)).

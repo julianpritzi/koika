@@ -727,11 +727,6 @@ Notation "'done'" :=
     ("bar", bits_t 5)
   ];
 |}.
-Section test.
-  Context {reg_t ext_fn_t : Type}.
-  Context {R : reg_t -> type}.
-  Context {Sigma : ext_fn_t -> ExternalSignature}.
-
 Definition xx : action' R Sigma (sig := [("v", struct_t test_sig)]) :=
   (Unop (Struct1 GetField _ (struct_idx "foo" _)) (Var (var_ref "v" _))).
 
@@ -743,6 +738,57 @@ Definition test : action' R Sigma (sig := [("v", struct_t test_sig)]) :=
 (*                                   Tests                                   *)
 (* ========================================================================= *)
 
+
+Module Tests'.
+Section Tests'.
+  Inductive reg_t :=
+  | reg0
+  | reg1.
+
+  Definition R (r : reg_t) := bits_t 64.
+  Definition R' (r : reg_t) :=
+    match r with
+    | reg0 => bits_t 64
+    | reg1 => bits_t 64
+    end.
+
+
+  Context {ext_fn_t : Type}.
+
+  Context {Sigma : ext_fn_t -> ExternalSignature}.
+
+  Program Definition read_reg : function R Sigma := <{
+  fun read_reg (select : bits_t 1) : bits_t 64 =>
+    let data := if select
+      then read0(reg1)
+      else read0(reg0)
+    in data
+  }>.
+  Fail Next Obligation.
+  Print read_reg.
+
+  Program Definition read_reg' : function R' Sigma := <{
+  fun read_reg' (select : bits_t 1) : unit_t =>
+    if select
+      then read0(reg1)
+      else read0(reg0)
+  }>.
+  Fail Next Obligation.
+
+  Inductive ext_fn_t' :=
+  | ext1.
+  Definition Sigma' (fn: ext_fn_t') := {$ bits_t 1 ~> bits_t 64$}.
+
+  Program Definition get_data : action' R Sigma' (sig := [("select", bits_t 1)]) := <{
+  (* fun get_data (select : bits_t 1) : unit_t => *)
+    if select
+      then extcall ext1(Ob~1)
+      else read0(reg1)
+  }>.
+  Fail Next Obligation.
+
+End Tests'.
+End Tests'.
 
 Module Type Tests.
   Inductive reg_t := reg1.
