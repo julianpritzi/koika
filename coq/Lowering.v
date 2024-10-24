@@ -2,9 +2,8 @@
 Require Import Koika.Syntax Koika.TypedSyntaxFunctions Koika.SyntaxMacros.
 Require Export Koika.Common Koika.Environments.
 Require Koika.SyntaxMacros Koika.TypedSyntax Koika.LoweredSyntax.
-
 Import PrimTyped CircuitSignatures.
-
+Import LoweredSyntaxMacros.
 Section Lowering.
   Context {pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t: Type}.
 
@@ -131,7 +130,7 @@ Section Lowering.
       | TypedSyntax.ExternalCall fn a =>
         LoweredSyntax.ExternalCall fn (l a)
       | TypedSyntax.InternalCall fn args =>
-        SyntaxMacros.InternalCall
+        LoweredSyntaxMacros.InternalCall
           (lower_args' (@lower_action) args)
           (l fn.(int_body))
       | TypedSyntax.APos p a =>

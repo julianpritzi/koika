@@ -263,7 +263,7 @@ Section TypedSyntaxFunctions.
                         let '(env, args) := cont env in
                         (env, CtxCons k arg args)) args
                    (fun env => (env, CtxEmpty)) env in
-        let '(env, body) := annotate_action_register_histories env body in
+        let '(env, body) := annotate_action_register_histories env fn.(int_body) in
         (env, InternalCall {| int_name := fn.(int_name); int_body := body |} args)
       | APos pos a =>
         let '(env, a) := annotate_action_register_histories env a in

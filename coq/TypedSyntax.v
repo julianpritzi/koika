@@ -53,10 +53,10 @@ Section Syntax.
                  (arg: action sig (arg1Sig (Sigma fn)))
     : action sig (retSig (Sigma fn))
   | InternalCall {sig tau}
-                 (* TODO -- why does this list need to be reversed?? *)
-                 (fn : InternalFunction' fn_name_t (action (List.rev argspec) tau))
+                 (* TODO -- why does argspec need to be reversed?? *)
                  {argspec : tsig var_t}
-                 (args: context (fun k_tau => action sig (snd k_tau)) (List.rev argspec))
+                 (fn : InternalFunction' fn_name_t (action argspec tau))
+                 (args: context (fun k_tau => action sig (snd k_tau)) argspec)
     : action sig tau
   | APos {sig tau} (pos: pos_t) (a: action sig tau)
     : action sig tau.
