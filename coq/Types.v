@@ -305,7 +305,7 @@ Definition map_uintf_body {var_t fn_name_t action action': Type}
      uint_retType := fn.(uint_retType);
      uint_body := f fn.(uint_body) |}.
 
-Record InternalFunction' {fn_name_t: Type} {action: Type} :=
+Record InternalFunction' {fn_name_t action: Type} :=
   { int_name : fn_name_t;
     int_body : action }.
 Arguments InternalFunction' : clear implicits.

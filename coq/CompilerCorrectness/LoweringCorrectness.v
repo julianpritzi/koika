@@ -54,7 +54,7 @@ Section LoweringCorrectness.
     | [ H: linterp _ _ _ _ = _ |- _ ] => rewrite H
     | [  |- context[match ?d with _ => _ end] ] => is_var d; destruct d
     | [  |- context[eq_rect _ _ _ _ ?pr] ] => destruct pr
-    | [  |- Some (_, _, _) = Some (_, _, _) ] => repeat f_equal
+    | [  |- Some (_, _, _) = Some (_, _, _) ] => repeat (progress f_equal + apply f_equal)
     | [  |- Some _ = Some _ ] => f_equal
     | _ => (apply _eq_of_value ||
            apply _neq_of_value ||

@@ -1113,11 +1113,11 @@ them before writing to the registers.\n"
         let bindings, body = loop pos [] action in
         List.rev bindings, body in
 
-      let package_intfun fn argspec tau body =
+      let package_intfun fn argspec tau =
         { Extr.uint_name = hpp.cpp_fn_names fn.Extr.int_name;
           Extr.uint_argspec = argspec;
           Extr.uint_retType = tau;
-          Extr.uint_body = body } in
+          Extr.uint_body = fn.Extr.int_body } in
 
       (* Table mapping function objects to unique names.  This is reset for each
          rules, because each implementation of a function is specific to one
@@ -1321,7 +1321,7 @@ them before writing to the registers.\n"
           | intf, None ->
              let nm = ensure_fresh (hpp.cpp_fn_names fn.Extr.int_name) in
              fns := (pos, nm, intf) :: !fns;
-             Hashtbl.add internal_functions intf nm in
+             Hashtbl.add internal_functions intf nm; in
         let rec loop pos = function
           | Extr.Fail _
             | Extr.Var _

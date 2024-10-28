@@ -1,34 +1,11 @@
 (*! Frontend | Macros used in untyped programs !*)
 Require Import Koika.Common Koika.Types Koika.Syntax Koika.TypedSyntax Koika.TypedSyntax Koika.Primitives.
 Import PrimUntyped.
-From Coq Require BinaryString OctalString HexString HexadecimalString DecimalString.
 
 Section SyntaxMacros.
   Context {pos_t var_t fn_name_t reg_t ext_fn_t: Type}.
 
   Notation uaction := (uaction pos_t var_t fn_name_t reg_t ext_fn_t).
-
-  (* Coq's implementation just silently returns 0 on an invalid string -
-    for better error recognition these methods are redefined here returning option *)
-  Local Fixpoint num_string_to_option_N' (s : string) (base : N) (convert : Ascii.ascii -> option N) (remainder : option N) : option N :=
-    match s with
-    | EmptyString => remainder
-    | String c s' => num_string_to_option_N' s' base convert
-      (match remainder, convert c with
-      | Some rem, Some c_v => Some (N.add (N.mul base rem) c_v)
-      | _, _ => None
-      end)
-    end.
-  Local Definition num_string_to_option_N (s : string) (base : N) (convert : Ascii.ascii -> option N) : option N :=
-    match s with
-    | EmptyString => None
-    | String _ _ => num_string_to_option_N' s base convert (Some 0%N)
-    end.
-  
-  Definition bin_string_to_N s := (must (num_string_to_option_N s 2 BinaryString.ascii_to_digit)).
-  Definition oct_string_to_N s := (must (num_string_to_option_N s 8 OctalString.ascii_to_digit)).
-  Definition dec_string_to_N s := (must (option_map N.of_uint (DecimalString.NilZero.uint_of_string s))).
-  Definition hex_string_to_N s := (must (num_string_to_option_N s 16 HexString.ascii_to_digit)).
 
   Definition bits_of_ascii c : bits 8 :=
     match c with
@@ -225,7 +202,6 @@ End Display.
 
 Require Import Koika.LoweredSyntax.
 
-Module LoweredSyntaxMacros.
 Section LoweredSyntaxMacros.
   Context {pos_t var_t fn_name_t reg_t ext_fn_t: Type}.
   Context {CR: reg_t -> nat}
@@ -289,5 +265,4 @@ Section LoweredSyntaxMacros.
              (fn_body: action fn_sig sz)
     : action sig sz :=
     InternalCall' args (suffix_action sig fn_body).
-End LoweredSyntaxMacros.
 End LoweredSyntaxMacros.

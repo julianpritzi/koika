@@ -3,7 +3,7 @@ Require Import
   Koika.Common
   Koika.TypedSyntax
   Koika.IdentParsing
-  Koika.SyntaxMacros.
+  Koika.TypedSyntaxMacros.
 Require Koika.Syntax. (* Necessary for scheduler *)
 Require Import Unicode.Utf8.
 
@@ -191,7 +191,6 @@ Notation "'(' a ')'" := (a) (in custom koika_t, format "'[v' ( a ) ']'").
 (* TODO add support for enum and struct constants *)
 Notation "'#' s" := (Const (tau := bits_t _) s) (in custom koika_t at level 0, s constr at level 0, only parsing).
 
-
 (* ========================================================================= *)
 (*                   Notations beginning with an identifier                  *)
 (* ========================================================================= *)
@@ -210,6 +209,54 @@ Notation "'#' s" := (Const (tau := bits_t _) s) (in custom koika_t at level 0, s
  *   Some of the literal notations also start with an identifier.
  *   Thus, the same restrictions apply.
  *)
+(* Literal parsing
+ *
+ * The arguably nicest syntax for literals would be something like
+ * 0b0110 for binary and 0xc0ffee for hexadecimal.
+ * However, there are several challanges which make it hard to use these
+ * Notations. I try to go over them step by step.
+ *
+ * First, what if we try to define notations with these prefixes? like:
+ * "'0b' num" and "'0x' num" ? Then we get a problem with the hexadecimal
+ * numbers because we would like 'num' to be either something coq would parse
+ * as a number like 09385 or something coq would parse as an identifier like
+ * c0ffee or even something coq wouldn't parse like 09c0ffee, so that doesn't
+ * work. We could try to get around the problem by letting num be a string
+ * and then parsing that string ourself with a function (string -> bits _).
+ * That solution actually works, however, it doesn't look that nice 0x"8afe80"
+ *
+ * Defining own notations to parse hexadecimals character by character doesn't
+ * work either since these notations must be entered seperated by a symbol or
+ * whitespace so we would need to enter something like: '0x 9 c 0 f f e' or
+ * '0x~9~c~0~f~f~e'. This is extremely annoying to type and thus inacceptable.
+ *
+ * Note: Coq's parser actually can parse hexadecimals, but these are expected
+ *   to always be prefixed by '0x' (in other words: coq parses the prefix as
+ *   part of the number itself, thus it cannot be part of our notation)
+ *
+ * So going back to the previous example, it would actually be possible to parse
+ * 0b01101 using a custom 'Number Notation' for decimal and 0x0xC0FFEE. Yes we
+ * would need a double 0x prefix -> the first for our syntax to start parsing a
+ * number, the second for coq's number parsing, to tells it's a hexadecimal.
+ * To cut the first 0x of our notations off, we would need to parse "num". So
+ * basically a 'catch-all'-notation parsing numbers. However the problem here
+ * is that we already have a 'catch-all'-notation for our variables that are
+ * parsed as constr, so the parser won't let us define that notation.
+ *
+ * TODO:
+ *   At this point it might be possible to use the same Notation for the hex-
+ *   numbers and the variables together with some ltac-magic to distinguish if
+ *   a number was parsed or nat. However, I wasn't able to pull that off so far.
+ *
+ * Despite this ^ possibility there are basically 2 options. First: use a prefix
+ * and coq's built-in parsing like $0b0110 and $0xc0ffee or parse numbers as
+ * identifiers and convert them to strings which are then parsed to bit vectors.
+ * For that we could use the same Notation parsing variables and numbers and
+ * distinguish them later by their prefix. E.g. numbers starting with Ox and Ob
+ * everthing else is a variable (note that these Notations start with an O
+ * instead of a 0 to let coq parse them as an ident instead of a number, e.g.
+ * Ox9C0FFE is a totally valid ident for coq)
+ *)
 Notation "a" := (Var (var_ref (ident_to_string a) _)) (in custom koika_t at level 0, a constr at level 0, only parsing).
 Notation "a" := (Var a) (in custom koika_t at level 0, a constr at level 0, only printing).
 
@@ -218,57 +265,6 @@ Notation "a" := (Var a) (in custom koika_t at level 0, a constr at level 0, only
 Export (hints) IdentParsing.TC.
 Notation "a ':=' b" := (let aa := (TC.ident_to_string a) in Assign (var_ref aa _) b) (in custom koika_t at level 0, a constr at level 0, b custom koika_t at level 89, only parsing).
 Notation "a ':=' b" := (                                    Assign a b             ) (in custom koika_t at level 0, a constr at level 0, b custom koika_t at level 89, only printing).
-
-(*
- * Assume you have a function in a Modul:
- * ```
- * Inductive reg_t := reg1.
- * Definition R (r : reg_t) := bits_t 2.
- * Definition func : function R empty_Sigma := <{
- *   fun f () : bits_t 2 =>
- *     read0(reg1)
- * }>.
- * ```
- *
- * This function is typed using the [R] and [Sigma]
- * of the modul. However, to call this function in
- * a composition of modules it needs to be typed with
- * the [super_R] and (possibly) [super_Sigma] of this
- * larger module. (See TypedSyntax.v [InternalCall] -
- * `body` has the same R/Sigma as the retuned type)
- *
- * This function will lift a given action [act]
- *)
-Fixpoint lift_reg
-  {reg_t sreg_t ext_fn_t tau sig}
-  {Sigma: ext_fn_t -> ExternalSignature}
-  {R : forall r : reg_t, type}
-  {sR : forall sr : sreg_t, type}
-  (lift : {lift' : reg_t -> sreg_t | forall r : reg_t, sR (lift' r) = R r})
-  (act : action' (tau := tau) (sig := sig) R Sigma)
-  : action' (tau := tau) (sig := sig) sR Sigma :=
-    let (lift_fn, liftH) := lift in
-    match act with
-    | Fail tau => Fail tau
-    | Var mem => Var mem
-    | Const val => Const val
-    | Assign mem val => Assign mem (lift_reg lift val)
-    | Seq a1 a2 => Seq (lift_reg lift a1) (lift_reg lift a2)
-    | Bind var val body => Bind var (lift_reg lift val) (lift_reg lift body)
-    | If cond tr fl => If (lift_reg lift cond) (lift_reg lift tr) (lift_reg lift fl)
-    | Read port idx => rew liftH idx in
-      Read port (lift_fn idx)
-    | Write port idx val =>
-      Write port (lift_fn idx) (lift_reg lift (rew <- liftH idx in val))
-    | Unop fn arg => Unop fn (lift_reg lift arg)
-    | Binop fn arg1 arg2 => Binop fn (lift_reg lift arg1) (lift_reg lift arg2)
-    | ExternalCall fn arg => ExternalCall fn (lift_reg lift arg)
-    | InternalCall fn args =>
-      InternalCall {| int_name := fn.(int_name); int_body := (lift_reg lift fn.(int_body)) |}
-      (rew List.map_id _ in @cmap _ _ _ (fun k_tau => action' (tau := (snd k_tau)) sR Sigma)
-        id (fun _ => lift_reg lift) _ args)
-    | APos pos a => APos pos (lift_reg lift a)
-    end.
 
 (* Koika_args *)
 (* TODO support trailing comma *)
@@ -282,7 +278,10 @@ Notation "fn args" :=
     (in custom koika_t at level 0, fn constr at level 0, args custom koika_t_args, only parsing).
 
 Notation "instance  '.(' fn ')' args" :=
-  (InternalCall {| int_name := fn.(int_name); int_body := (lift_reg (exist _ instance (fun _ => eq_refl)) fn.(int_body)) |} args)
+  (InternalCall {|
+    int_name := fn.(int_name);
+    int_body := (lift {| lift_fn := instance; lift_comm := eq_refl |}
+                      _ fn.(int_body)) |} args)
     (in custom koika_t at level 0, instance constr at level 0, fn constr, args custom koika_t_args).
 
 Notation "'{' fn '}' args" :=
@@ -324,6 +323,10 @@ Class StructIdx sig (f : string) := struct_idx : struct_index sig.
 Hint Mode StructIdx + + : typeclass_instances.
 Arguments struct_idx sig f {StructIdx} : assert.
 Hint Extern 1 (StructIdx ?sig ?f) => exact (must (List_assoc f sig.(struct_fields))) : typeclass_instances.
+
+Notation "v '.[' f ']'" :=
+  (Unop  (Struct1 GetField   _ (struct_idx _ f)) v)
+  (in custom koika_t at level 0, f custom koika_t_var, format "v .[ f ]").
 
 Notation "'get' '(' v ',' f ')'" :=
   (Unop  (Struct1 GetField   _ (struct_idx _ f)) v)
@@ -392,29 +395,6 @@ Notation "'Ob'" := (Const (tau := bits_t 0) Ob)
   (in custom koika_t at level 0, format "'Ob'").
 
 (* koika bit vector literals *)
-(* From Coq Require BinaryString OctalString HexString HexadecimalString DecimalString.
-
-(* Coq's implementation just silently returns 0 on an invalid string -
-  for better error recognition these methods are redefined here returning option *)
-Local Fixpoint num_string_to_option_N' (s : string) (base : N) (convert : Ascii.ascii -> option N) (remainder : option N) : option N :=
-  match s with
-  | EmptyString => remainder
-  | String c s' => num_string_to_option_N' s' base convert
-    (match remainder, convert c with
-    | Some rem, Some c_v => Some (N.add (N.mul base rem) c_v)
-    | _, _ => None
-    end)
-  end.
-Local Definition num_string_to_option_N (s : string) (base : N) (convert : Ascii.ascii -> option N) : option N :=
-  match s with
-  | EmptyString => None
-  | String _ _ => num_string_to_option_N' s base convert (Some 0%N)
-  end.
-
-Local Definition bin_string_to_N s := (must (num_string_to_option_N s 2 BinaryString.ascii_to_digit)).
-Local Definition oct_string_to_N s := (must (num_string_to_option_N s 8 OctalString.ascii_to_digit)).
-Local Definition dec_string_to_N s := (must (option_map N.of_uint (DecimalString.NilZero.uint_of_string s))).
-Local Definition hex_string_to_N s := (must (num_string_to_option_N s 16 HexString.ascii_to_digit)). *)
 
 Local Definition len := String.length.
 
@@ -427,6 +407,8 @@ Ltac bits_of_N default val :=
     then exact (Bits.of_N default val)
     else exact (Bits.of_N _ val)
   end. *)
+(* TODO maybe parse numbers like this *)
+(* Check (ident_to_string Ob001100). *)
 
 Notation "num ':b' sz" := (Const (tau := bits_t _)      (Bits.of_N (sz <: nat)            (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0, sz constr at level 0, only parsing).
 Notation "num ':b'"    := (Const (tau := bits_t _) ltac:(bits_of_N ((len num) * 1)        (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0,                       only parsing).
@@ -454,12 +436,8 @@ Notation "'0x' num sz" := (Const (tau := bits_t _)      (Bits.of_N (sz <: nat)  
 Notation "'0x' num"    := (Const (tau := bits_t _) ltac:(bits_of_N ((len num) * 4)        (hex_string_to_N num))) (in custom koika_t at level 0, num constr at level 0,                       only parsing).
 Notation "'0x' num"    := (Const (tau := bits_t _)      (Bits.of_N _                      (hex_string_to_N num))) (in custom koika_t at level 0, num constr at level 0, only printing,        format "'0x' num").
 
-
 (* legacy number format *)
 Notation "'|' a '`d' b '|'" := (Const (tau := bits_t _) (Bits.of_N (a<:nat) b%N)) (in custom koika_t at level 0, a constr at level 0, b constr at level 0).
-
-(* literal inside koika - wrapped inside Const to function as a uaction *)
-(* Notation "'|' literal '|'" := (Const (tau := bits_t _) literal) (in custom koika_t, literal custom koika_t_literal). *)
 
 (* ========================================================================= *)
 (*                                Constructors                               *)
@@ -585,6 +563,10 @@ Arguments APos         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau
 Arguments Build_InternalFunction' {fn_name_t action} & int_name int_body : assert.
 Arguments macro_switch {reg_t ext_fn_t} {R Sigma} {sig} & {tau tau_eq} var default branches : assert.
 Arguments struct_init {reg_t ext_fn_t} {R Sigma} {sig} & s_sig fields : assert.
+
+(* TODO: what does this? *)
+(* Set Typeclasses Dependency Order. *)
+(* Set Typeclasses Filtered Unification *)
 
 (* ========================================================================= *)
 (*                                   Tests                                   *)
@@ -898,7 +880,7 @@ Module Type Tests2.
       ("four" , bits_t 3);
       ("five" , enum_t numbers_e) ]
   |}.
- 
+
   Definition num_test_b_1 : [| "01101":b     =koika= Ob~0~1~1~0~1 |] := eq_refl.
   Definition num_test_b_2 : [| 0b"00011"     =koika= Ob~0~0~0~1~1 |] := eq_refl.
   Definition num_test_b_3 : [| "11":b5       =koika= Ob~0~0~0~1~1 |] := eq_refl.
