@@ -3,6 +3,7 @@ Require Export Koika.Member Koika.TypedSyntax.
 Require Import Koika.Primitives Koika.TypedSemantics.
 Import PrimTyped.
 From Coq Require BinaryString OctalString HexString HexadecimalString DecimalString.
+Require Import Ascii.
 
 Require Import Magic.
 
@@ -15,6 +16,20 @@ Section TypedSyntaxMacros.
   Notation action := (action pos_t var_t fn_name_t).
   Notation InternalFunction R Sigma sig tau := (InternalFunction pos_t var_t fn_name_t R Sigma sig tau).
 
+  (* filter a single char out of a string *)
+  Local Fixpoint filters' (s : string) (a : ascii) : string :=
+    match s with
+    | EmptyString => EmptyString
+    | String c s' => if ascii_dec c a
+      then filters' s' a
+      else String c (filters' s' a)
+    end.
+  (* filter a set of chars out of a string *)
+  Fixpoint filter_string (s : string) (l : list ascii) : string :=
+    match l with
+    | a :: l' => filter_string (filters' s a) l'
+    | [] => s
+    end.
   (* Coq's implementation just silently returns 0 on an invalid string -
     for better error recognition these methods are redefined here returning option *)
   Local Fixpoint num_string_to_option_N' (s : string) (base : N) (convert : Ascii.ascii -> option N) (remainder : option N) : option N :=

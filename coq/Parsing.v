@@ -2,7 +2,8 @@
 Require Import
         Koika.Common
         Koika.Syntax
-        Koika.IdentParsing.
+        Koika.IdentParsing
+        Koika.TypedSyntaxMacros.
 
 Export Koika.Types.SigNotations.
 Export Koika.Primitives.PrimUntyped.
@@ -157,55 +158,11 @@ Notation "'Ob'"            := (USugar (UConstBits Bits.nil))
   (in custom koika at level 0).
 
 
-
 (* koika bit vector literals *)
-From Coq Require BinaryString OctalString HexString HexadecimalString DecimalString.
-
-(* Unset Printing Notations.
-From Coq Require Ascii.
-
-Compute (list_ascii_of_string "_").
-Compute (String "_" EmptyString). *)
-
-Require Import Ascii.
-Local Fixpoint filters' (s : string) (a : ascii) : string :=
-  match s with
-  | EmptyString => EmptyString
-  | String c s' => if ascii_dec c a
-    then filters' s' a
-    else String c (filters' s' a)
-  end.
-Local Fixpoint filters (s : string) (l : list ascii) : string :=
-  match l with
-  | a :: l' => filters (filters' s a) l'
-  | [] => s
-  end.
-
-(* Coq's implementation just silently returns 0 on an invalid string -
-  for better error recognition these methods are redefined here returning option *)
-Local Fixpoint num_string_to_option_N' (s : string) (base : N) (convert : Ascii.ascii -> option N) (remainder : option N) : option N :=
-  match s with
-  | EmptyString => remainder
-  | String c s' => num_string_to_option_N' s' base convert
-    (match remainder, convert c with
-    | Some rem, Some c_v => Some (N.add (N.mul base rem) c_v)
-    | _, _ => None
-    end)
-  end.
-Local Definition num_string_to_option_N (s : string) (base : N) (convert : Ascii.ascii -> option N) : option N :=
-  match s with
-  | EmptyString => None
-  | String _ _ => num_string_to_option_N' s base convert (Some 0%N)
-  end.
-
-Local Definition bin_string_to_N s := (must (num_string_to_option_N s 2 BinaryString.ascii_to_digit)).
-Local Definition oct_string_to_N s := (must (num_string_to_option_N s 8 OctalString.ascii_to_digit)).
-Local Definition dec_string_to_N s := (must (option_map N.of_uint (DecimalString.NilZero.uint_of_string s))).
-Local Definition hex_string_to_N s := (must (num_string_to_option_N s 16 HexString.ascii_to_digit)).
 
 Local Definition len := String.length.
-Local Definition filt s := filters s ["_"; "'"]%char.
-
+Require Import (notations) Ascii.
+Local Definition filt s := filter_string s ["_"; "'"]%char.
 Notation "num ':b' sz" := (let s := filt num in (USugar (UConstBits (Bits.of_N (sz <: nat)            (bin_string_to_N s))))) (in custom koika at level 0, num constr at level 0, sz constr at level 0, only parsing).
 Notation "num ':b'"    := (let s := filt num in (USugar (UConstBits (Bits.of_N ((len s) * 1)          (bin_string_to_N s))))) (in custom koika at level 0, num constr at level 0,                       only parsing).
 Notation "'0b' num sz" := (let s := filt num in (USugar (UConstBits (Bits.of_N (sz <: nat)            (bin_string_to_N s))))) (in custom koika at level 0, num constr at level 0, sz constr at level 0, format "'0b' num sz").
@@ -220,10 +177,10 @@ Notation "'0o' num"    := (let s := filt num in (USugar (UConstBits (Bits.of_N _
 
 Notation "num ':d' sz" := (let s := filt num in (USugar (UConstBits (Bits.of_N (sz <: nat)            (dec_string_to_N s))))) (in custom koika at level 0, num constr at level 0, sz constr at level 0, only parsing).
 Notation "num ':d'"    := (let s := filt num in (USugar (UConstBits (Bits.of_N (1 + (N.to_nat (N.log2 (dec_string_to_N s))))
-                                                            (dec_string_to_N s))))) (in custom koika at level 0, num constr at level 0,                       only parsing).
+                                                                                                      (dec_string_to_N s))))) (in custom koika at level 0, num constr at level 0,                       only parsing).
 Notation "'0d' num sz" := (let s := filt num in (USugar (UConstBits (Bits.of_N (sz <: nat)            (dec_string_to_N s))))) (in custom koika at level 0, num constr at level 0, sz constr at level 0, format "'0d' num sz").
 Notation "'0d' num"    := (let s := filt num in (USugar (UConstBits (Bits.of_N (1 + (N.to_nat (N.log2 (dec_string_to_N s))))
-                                                            (dec_string_to_N s))))) (in custom koika at level 0, num constr at level 0,                       only parsing).
+                                                                                                      (dec_string_to_N s))))) (in custom koika at level 0, num constr at level 0,                       only parsing).
 Notation "'0d' num"    := (let s := filt num in (USugar (UConstBits (Bits.of_N _                      (dec_string_to_N s))))) (in custom koika at level 0, num constr at level 0, only printing,        format "'0d' num").
 
 Notation "num ':h' sz" := (let s := filt num in (USugar (UConstBits (Bits.of_N (sz <: nat)            (hex_string_to_N s))))) (in custom koika at level 0, num constr at level 0, sz constr at level 0, only parsing).

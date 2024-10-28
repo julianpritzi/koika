@@ -152,37 +152,31 @@ Notation "'!' a"       := (Unop  (Bits1 (Not _))               a  ) (in custom k
 Notation "a '[' b ']'"        := (Binop (Bits2 (Sel _))            a b) (in custom koika_t at level 60, format "'[' a [ b ] ']'").
 Notation "a '[' b ':+' c ']'" := (Binop (Bits2 (IndexedSlice _ c)) a b) (in custom koika_t at level 60, c constr at level 0, format "'[' a [ b :+ c ] ']'").
 
-(* get field of struct *)
-(* Notation "a '.[' f ']'" := (UUnop (UStruct1 (UGetField f)) a) (in custom koika at level 60, f custom koika_var). *)
 
-(* Section KoikaTypeCast.
-  Context {reg_t ext_fn_t : Type}.
-  Context {R : reg_t -> type}.
-  Context {Sigma : ext_fn_t -> ExternalSignature}.
-  (* #[local] Definition uaction := Syntax.uaction pos_t var_t fn_name_t reg_t ext_fn_t. *)
+Class TypeOfSig {sig : Type} (s : sig) := type_of_sig : type.
+#[export] Instance type_of_struct_sig {s} : @TypeOfSig struct_sig s := struct_t s.
+#[export] Instance type_of_enum_sig   {s} : @TypeOfSig enum_sig   s := enum_t s.
+#[export] Instance type_of_array_sig  {s} : @TypeOfSig array_sig  s := array_t s.
+Arguments type_of_sig {sig} s {TypeOfSig} : assert.
 
-  Class KoikaCast {sig} {tau_in} {tau_out}
-    (v : action' (sig := sig) (tau := tau_in) R Sigma) := koika_cast : action' (sig := sig) (tau := tau_out) R Sigma.
+Notation "expr : sig" := (Unop (Conv (type_of_sig sig) Unpack) expr)
+  (in custom koika_t at level 2, sig constr at level 0).
 
-  #[export] Instance koika_cast_struct {s v} : @KoikaCast _ (struct_sig s) _ v := (UUnop (UConv (UUnpack (struct_t s))) v).
-  #[export] Instance koika_cast_enum   {s v} : @KoikaCast _ (enum_sig   s) _ v := (UUnop (UConv (UUnpack (enum_t s))) v).
-  #[export] Instance koika_cast_arry   {s v} : @KoikaCast _ (array_sig  s) _ v := (UUnop (UConv (UUnpack (array_t s))) v).
-End KoikaTypeCast. *)
-(* since this syntax is untyped we dont know if expr
- * has a struct or bits type. However only bits can
- * be converted to structs using `UConv`. So this notations
- * is wrapping each expr in a `UPack` first to convert it
- * to bits and is then appliny the actual conversion to the
- * desired type.
- *)
-(* Notation "expr : sig" :=
-  (_ : KoikaCast sig (UUnop (UConv UPack) expr))
-  (in custom koika at level 2, sig constr at level 0).
+Notation "expr : 'bits'" := (Unop (Conv _ Pack) expr)
+  (in custom koika_t at level 2).
 
-Notation "expr : 'bits' " :=
-  (UUnop (UConv UPack) expr)
-  (in custom koika at level 2). *)
+(* for some reason, using struct_idx coq can infer the parameter
+'sig' from the return type, by using StructIdx however, coq fails *)
+(* Definition test : struct_index (Build_struct_sig' type "" [("foo", bits_t 1);("bar", bits_t 5)]) := struct_idx _ "foo". *)
+(* Definition test' : struct_index (Build_struct_sig' type "" [("foo", bits_t 1);("bar", bits_t 5)]) := _ : StructIdx _ "foo". *)
+Class StructIdx sig (f : string) := struct_idx : struct_index sig.
+Hint Mode StructIdx + + : typeclass_instances.
+Arguments struct_idx sig f {StructIdx} : assert.
+Hint Extern 1 (StructIdx ?sig ?f) => exact (must (List_assoc f sig.(struct_fields))) : typeclass_instances.
 
+Notation "v '.[' f ']'" :=
+  (Unop  (Struct1 GetField   _ (struct_idx _ f)) v)
+  (in custom koika_t at level 0, f custom koika_t_var, format "v .[ f ]").
 
 Notation "'`' a '`'" := (a) (in custom koika_t, a constr).
 Notation "'(' a ')'" := (a) (in custom koika_t, format "'[v' ( a ) ']'").
@@ -314,19 +308,6 @@ Notation "'pack(' a ')'"             := (Unop (Conv _ Pack)       a) (in custom 
 Notation "'unpack(' t ',' v ')'"     := (Unop (Conv t Unpack)     v) (in custom koika_t, t constr).
 
 Notation "'extcall' method '(' arg ')'" := (ExternalCall method arg) (in custom koika_t, method constr at level 0).
-
-(* for some reason, using struct_idx coq can infer the parameter
-'sig' from the return type, by using StructIdx however, coq fails *)
-(* Definition test : struct_index (Build_struct_sig' type "" [("foo", bits_t 1);("bar", bits_t 5)]) := struct_idx _ "foo". *)
-(* Definition test' : struct_index (Build_struct_sig' type "" [("foo", bits_t 1);("bar", bits_t 5)]) := _ : StructIdx _ "foo". *)
-Class StructIdx sig (f : string) := struct_idx : struct_index sig.
-Hint Mode StructIdx + + : typeclass_instances.
-Arguments struct_idx sig f {StructIdx} : assert.
-Hint Extern 1 (StructIdx ?sig ?f) => exact (must (List_assoc f sig.(struct_fields))) : typeclass_instances.
-
-Notation "v '.[' f ']'" :=
-  (Unop  (Struct1 GetField   _ (struct_idx _ f)) v)
-  (in custom koika_t at level 0, f custom koika_t_var, format "v .[ f ]").
 
 Notation "'get' '(' v ',' f ')'" :=
   (Unop  (Struct1 GetField   _ (struct_idx _ f)) v)
