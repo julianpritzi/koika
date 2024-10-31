@@ -87,7 +87,7 @@ Notation "a  ..  b" := (cons a ..  (cons b nil) ..)  (in custom koika_t_binder a
 Local Definition refine_sig_tau sig tau {reg_t ext_fn_t}
   {R : reg_t -> type} {Sigma : ext_fn_t -> ExternalSignature}
   (a : action' R Sigma (tau := tau) (sig := sig)) : action' R Sigma := a.
-Arguments refine_sig_tau sig tau & {reg_t ext_fn_t} {R Sigma} a : assert.
+Arguments refine_sig_tau sig tau {reg_t ext_fn_t} {R Sigma} & a : assert.
 
 Notation "'fun' nm args ':' ret '=>' body" :=
   (Build_InternalFunction' nm%string (refine_sig_tau args ret body))
@@ -553,6 +553,49 @@ Arguments struct_init {reg_t ext_fn_t} {R Sigma} {sig} & s_sig fields : assert.
 (*                                   Tests                                   *)
 (* ========================================================================= *)
 
+(* Ltac eval_cbn x :=
+  eval cbn in x.
+Ltac eval_hnf x :=
+  eval hnf in x.
+Ltac eval_cbv x :=
+  eval cbv in x.
+Ltac eval_vm_compute x :=
+  eval vm_compute in x.
+Ltac eval_native_compute x :=
+  eval native_compute in x. *)
+
+Ltac eval_type' x :=
+  let t := type of x in
+  let t' := eval vm_compute in t in
+  constr:(x: t').
+
+Notation eval_type t :=
+  ltac:(let t := eval_type' t in
+        exact t) (only parsing).
+(* unify with action'? *)
+Notation eval_type_act act :=
+  ((fun {t} (a : action' _ _ (tau := t)) =>
+  ltac:(let t := eval_type' t in
+        exact t)) _ act) (only parsing).
+
+Section Macro.
+  Context {reg_t ext_fn_t: Type}.
+  Context {R : reg_t -> type}.
+  Context {Sigma: ext_fn_t -> ExternalSignature}.
+  Definition idk : action R Sigma := <{0b"011" && 0b"110"}>.
+  Definition idk2 := eval_type idk.
+    
+  Definition idk2 := idk : ltac:(
+    let T := type of idk in
+    let T' := eval vm_compute in T in exact (T')
+    (* match T with
+    | action _ _ (tau := ?t) => simpl T; exact (T)
+    end
+  ). *)
+
+Set Printing Implicit. Check (<{0b"011" && 0b"110"}> : action _ _ ).
+Set Printing Implicit. Check (<{0b"011" && 0b"110"}> : action _ _ (tau := bits_t 3)).
+
 Module Tests'.
 Section Tests'.
   Inductive reg_t :=
@@ -748,7 +791,7 @@ Module Type Tests2.
     fail
   }>.
   Fail Next Obligation.
-  Definition test_28 : _action :=  <{
+  Definition test_28 : _action := <{
     let var := 0b"101" in
     match var with
     | Ob~1~1~1 => pass
