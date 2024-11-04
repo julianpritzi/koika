@@ -44,6 +44,33 @@ Definition function
     Types.InternalFunction' fn_name_t
       (TypedSyntax.action pos_t var_t fn_name_t R Sigma sig tau).
 
+(* When checking a concatenation we need to use the
+ * bidirectionality hint before the arguments. Thats
+ * because we need the unification to resolve R and Sigma
+ * which may be used in the arguments (e.g. by a write).
+ *
+ * However, while we still haven't type checked the arguments
+ * the unification won't work since a tau of `bits_t ?sz` is
+ * expected but we only know that a `bits_t (?sz1 + ?sz2)` is
+ * provided.
+ *
+ * Thus we need to ensure the type checker that `?sz = ?sz1 + ?sz2`.
+ * This is done by an explicit proof here, which is going to be
+ * trivial, once all existentials are resolved. Then the proof is
+ * going to be something like `5 = 1 + 4`, which should be prooven
+ * by simply using reflexivity `eq_refl`.
+ *)
+Local Definition proof_tau_eq' {sig tau_in tau_out} {reg_t ext_fn_t}
+  {R : reg_t -> type} {Sigma : ext_fn_t -> ExternalSignature}
+  (a : action' R Sigma (tau := tau_in) (sig := sig))
+  (proof : tau_in = tau_out)
+  : action' R Sigma (tau := tau_out) (sig := sig) :=
+    match proof with
+    | eq_refl => a
+    end.
+Arguments proof_tau_eq' {sig tau_in tau_out} {reg_t ext_fn_t} {R Sigma} a & proof : assert.
+Notation tau_eq a := (proof_tau_eq' a eq_refl).
+
 Declare Custom Entry koika_t.
 
 (* This is the entry point to transition from normal
@@ -136,15 +163,15 @@ Notation "a  '>='  b"  := (Binop (Bits2 (Compare false cGe _)) a b) (in custom k
 Notation "a  '>s='  b" := (Binop (Bits2 (Compare true  cGe _)) a b) (in custom koika_t at level 79).
 
 (* Bit concatenation / shifts *)
-Notation "a  '++'  b"  := (Binop (Bits2 (Concat _ _))          a b) (in custom koika_t at level 75).
-Notation "a  '>>'  b"  := (Binop (Bits2 (Lsr _ _))             a b) (in custom koika_t at level 74).
-Notation "a  '>>>'  b" := (Binop (Bits2 (Asr _ _))             a b) (in custom koika_t at level 74).
-Notation "a  '<<'  b"  := (Binop (Bits2 (Lsl _ _))             a b) (in custom koika_t at level 74).
+Notation "a  '++'  b"  := (tau_eq (Binop (Bits2 (Concat _ _))          a b)) (in custom koika_t at level 75).
+Notation "a  '>>'  b"  :=         (Binop (Bits2 (Lsr _ _))             a b)  (in custom koika_t at level 74).
+Notation "a  '>>>'  b" :=         (Binop (Bits2 (Asr _ _))             a b)  (in custom koika_t at level 74).
+Notation "a  '<<'  b"  :=         (Binop (Bits2 (Lsl _ _))             a b)  (in custom koika_t at level 74).
 
 (* Arithmetic *)
-Notation "a  '+'  b"   := (Binop (Bits2 (Plus     _))          a b) (in custom koika_t at level 70).
-Notation "a  '-'  b"   := (Binop (Bits2 (Minus    _))          a b) (in custom koika_t at level 70).
-Notation "a  '*'  b"   := (Binop (Bits2 (Mul    _ _))          a b) (in custom koika_t at level 69).
+Notation "a  '+'  b"   :=         (Binop (Bits2 (Plus     _))          a b)  (in custom koika_t at level 70).
+Notation "a  '-'  b"   :=         (Binop (Bits2 (Minus    _))          a b)  (in custom koika_t at level 70).
+Notation "a  '*'  b"   := (tau_eq (Binop (Bits2 (Mul    _ _))          a b)) (in custom koika_t at level 69).
 
 (* Unary operators *)
 Notation "'!' a"       := (Unop  (Bits1 (Not _))               a  ) (in custom koika_t at level 65, format "'!' a").
@@ -162,7 +189,7 @@ Arguments type_of_sig {sig} s {TypeOfSig} : assert.
 Notation "expr : sig" := (Unop (Conv (type_of_sig sig) Unpack) expr)
   (in custom koika_t at level 2, sig constr at level 0).
 
-Notation "expr : 'bits'" := (Unop (Conv _ Pack) expr)
+Notation "expr : 'bits'" := (tau_eq (Unop (Conv _ Pack) expr))
   (in custom koika_t at level 2).
 
 (* for some reason, using struct_idx coq can infer the parameter
@@ -297,8 +324,8 @@ Notation "'fail' '@(' t ')'" := (Fail          t) (in custom koika_t, t constr ,
 
 Notation "'read0' '(' reg ')' "           := (Read P0 reg)        (in custom koika_t, reg constr, format "'read0' '(' reg ')'").
 Notation "'read1' '(' reg ')' "           := (Read P1 reg)        (in custom koika_t, reg constr, format "'read1' '(' reg ')'").
-Notation "'write0' '(' reg ',' value ')'" := (Write P0 reg value) (in custom koika_t, reg constr, format "'write0' '(' reg ',' value ')'").
-Notation "'write1' '(' reg ',' value ')'" := (Write P1 reg value) (in custom koika_t, reg constr, format "'write1' '(' reg ',' value ')'").
+Notation "'write0' '(' reg ',' value ')'" := (refine_sig_tau _ _ (Write P0 reg value)) (in custom koika_t, reg constr, format "'write0' '(' reg ',' value ')'").
+Notation "'write1' '(' reg ',' value ')'" := (refine_sig_tau _ _ (Write P1 reg value)) (in custom koika_t, reg constr, format "'write1' '(' reg ',' value ')'").
 
 Notation "'zeroExtend(' a ',' b ')'" := (Unop (Bits1 (ZExtL _ b)) a) (in custom koika_t, b constr, format "'zeroExtend(' a ',' b ')'").
 Notation "'sext(' a ',' b ')'"       := (Unop (Bits1 (SExt  _ b)) a) (in custom koika_t, b constr, format "'sext(' a ',' b ')'").
@@ -310,18 +337,18 @@ Notation "'unpack(' t ',' v ')'"     := (Unop (Conv t Unpack)     v) (in custom 
 Notation "'extcall' method '(' arg ')'" := (ExternalCall method arg) (in custom koika_t, method constr at level 0).
 
 Notation "'get' '(' v ',' f ')'" :=
-  (Unop  (Struct1 GetField   _ (struct_idx _ f)) v)
+  (tau_eq (Unop  (Struct1 GetField   _ (struct_idx _ f)) v))
   (in custom koika_t, f custom koika_t_var, format "'get' '(' v ','  f ')'").
 
 Notation "'subst' '(' v ',' f ',' a ')'" :=
-  (Binop (Struct2 SubstField _ (struct_idx _ f)) v a)
+  (Binop (Struct2 SubstField _ (struct_idx _ f)) v (tau_eq a))
   (in custom koika_t, f custom koika_t_var, format "'subst' '(' v ','  f ',' a ')'").
 
-Notation "'getbits@' sig '(' v ',' f ')'"          :=
+Notation "'getbits@' sig '(' v ',' f ')'" :=
   (Unop  (Bits1 (GetFieldBits   sig (must (List_assoc f sig.(struct_fields))))) v)
   (in custom koika_t, sig constr at level 0, f custom koika_t_var,
     format "'getbits@' sig '(' v ','  f ')'").
-Notation "'substbits@' sig '(' v ',' f ',' a ')'"  :=
+Notation "'substbits@' sig '(' v ',' f ',' a ')'" :=
   (Binop (Bits2 (SubstFieldBits sig (must (List_assoc f sig.(struct_fields))))) v a)
   (in custom koika_t, sig constr at level 0, f custom koika_t_var,
     format "'substbits@' sig '(' v ','  f ','  a ')'").
@@ -391,11 +418,11 @@ Ltac bits_of_N default val :=
 (* TODO maybe parse numbers like this *)
 (* Check (ident_to_string Ob001100). *)
 
-Notation "num ':b' sz" := (Const (tau := bits_t _)      (Bits.of_N (sz <: nat)            (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0, sz constr at level 0, only parsing).
-Notation "num ':b'"    := (Const (tau := bits_t _) ltac:(bits_of_N ((len num) * 1)        (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0,                       only parsing).
-Notation "'0b' num sz" := (Const (tau := bits_t _)      (Bits.of_N (sz <: nat)            (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0, sz constr at level 0, format "'0b' num sz").
-Notation "'0b' num"    := (Const (tau := bits_t _) ltac:(bits_of_N ((len num) * 1)        (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0,                       only parsing).
-Notation "'0b' num"    := (Const (tau := bits_t _)      (Bits.of_N _                      (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0, only printing,        format "'0b' num").
+Notation "num ':b' sz" := (Const (tau := bits_t  _)      (Bits.of_N (sz <: nat)            (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0, sz constr at level 0, only parsing).
+Notation "num ':b'"    := (Const (tau := bits_t  _) ltac:(bits_of_N ((len num) * 1)        (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0,                       only parsing).
+Notation "'0b' num sz" := (Const (tau := bits_t sz)      (Bits.of_N (sz <: nat)            (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0, sz constr at level 0, format "'0b' num sz").
+Notation "'0b' num"    := (Const (tau := bits_t  _) ltac:(bits_of_N ((len num) * 1)        (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0,                       only parsing).
+Notation "'0b' num"    := (Const (tau := bits_t  _)      (Bits.of_N _                      (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0, only printing,        format "'0b' num").
 
 Notation "num ':o' sz" := (Const (tau := bits_t _)      (Bits.of_N (sz <: nat)            (oct_string_to_N num))) (in custom koika_t at level 0, num constr at level 0, sz constr at level 0, only parsing).
 Notation "num ':o'"    := (Const (tau := bits_t _) ltac:(bits_of_N ((len num) * 3)        (oct_string_to_N num))) (in custom koika_t at level 0, num constr at level 0,                       only parsing).
@@ -527,7 +554,57 @@ End TODO_contrs_arg_lists.
  * the outer terms into the inner terms and then they are used to infer the
  * type of registers and variables.                                          *)
 
-Arguments Fail         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & tau : assert.
+Module BidirectionalityHintsTest.
+Section BidirectionalityHintsTest.
+  Inductive reg_t := reg1 | reg2.
+  Definition R (r : reg_t) := match r with
+    | reg1 => bits_t 1
+    | reg2 => bits_t 2
+    end.
+  Context {ext_fn_t : Type}.
+  Context {Sigma: ext_fn_t -> ExternalSignature}.
+
+  Arguments Fail {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & tau : assert.
+  Definition test_Fail1 := (Fail (bits_t 3)) : action R Sigma.
+  Definition test_Fail2 := (Fail (_)) : action R Sigma (tau := bits_t 3).
+
+  (* Definition test_write := (Write P0 reg1 (Const Ob~1)) : action R Sigma. *)
+End BidirectionalityHintsTest.
+End BidirectionalityHintsTest.
+
+(* Bidirectionality Hints
+ *
+ * These hints basically affect when the unification the inferred type and
+ * explicitly given type is performed.
+ *
+ * Take the following koika action as an example:
+ *
+ * Definition some_write : action R Sigma := <{
+ *   write(reg1, Ob~1)
+ * }>.
+ *
+ * As a reference, these are the arguments to Write:
+ *  Write {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} port idx value
+ *
+ * Now, in order to type check this `Write` coq first has a look at its
+ * definition, to see what types of arguments are expected. Implicit arguments
+ * are converted to existential variables first and then coq goes on by checking
+ * that each arguments actually has its expected type.
+ * 
+ * Note: As they are basically irrelevant for the example I am going to ignore
+ *   pos_t, ..., ext_fn_t for breavity.
+ *
+ * So `R` and `Sigma` are kept as exitential variables and checked for their
+ * types without problems.
+ *
+ * Please refer to Li-yao Xia (https://proofassistants.stackexchange.com/a/1424)
+ * He gives a very good explanaition of these hints and how they affect the type
+ * checking. Most of the information here is taken from him.
+ *)
+
+
+(* Nothing needs to be inferred from the context  *)
+Arguments Fail         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} tau & : assert.
 Arguments Var          {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & {k tau} m : assert.
 Arguments Const        {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} & cst : assert.
 Arguments Assign       {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & {k tau} m ex : assert.
@@ -564,7 +641,7 @@ Ltac eval_vm_compute x :=
 Ltac eval_native_compute x :=
   eval native_compute in x. *)
 
-Ltac eval_type' x :=
+(* Ltac eval_type' x :=
   let t := type of x in
   let t' := eval vm_compute in t in
   constr:(x: t').
@@ -577,12 +654,11 @@ Notation eval_type_act act :=
   ((fun {t} (a : action' _ _ (tau := t)) =>
   ltac:(let t := eval_type' t in
         exact t)) _ act) (only parsing).
-
-Section Macro.
+*)
+(* Section Macro.
   Context {reg_t ext_fn_t: Type}.
   Context {R : reg_t -> type}.
   Context {Sigma: ext_fn_t -> ExternalSignature}.
-  Definition idk : action R Sigma := <{0b"011" && 0b"110"}>.
   Definition idk2 := eval_type idk.
     
   Definition idk2 := idk : ltac:(
@@ -590,27 +666,35 @@ Section Macro.
     let T' := eval vm_compute in T in exact (T')
     (* match T with
     | action _ _ (tau := ?t) => simpl T; exact (T)
-    end
+    end *)
   ). *)
 
-Set Printing Implicit. Check (<{0b"011" && 0b"110"}> : action _ _ ).
-Set Printing Implicit. Check (<{0b"011" && 0b"110"}> : action _ _ (tau := bits_t 3)).
+(* Set Printing Implicit. Check (<{0b"011" && 0b"110"}> : action _ _ ).
+Set Printing Implicit. Check (<{0b"011" && 0b"110"}> : action _ _ (tau := bits_t 3)). *)
 
 Module Tests'.
 Section Tests'.
   Inductive reg_t :=
   | reg0
-  | reg1.
+  | reg1
+  | reg2
+  | reg3.
 
   Definition R (r : reg_t) := bits_t 64.
   Definition R' (r : reg_t) :=
     match r with
     | reg0 => bits_t 64
     | reg1 => bits_t 64
+    | reg2 => bits_t 5
+    | reg3 => bits_t 4
     end.
 
   Context {ext_fn_t : Type}.
   Context {Sigma : ext_fn_t -> ExternalSignature}.
+
+  Definition test_concatenation : action' R' Sigma (sig := [("yo", bits_t 4)]) := <{
+    write0(reg2, 0b"1"1 ++ read0(reg3));
+  }>.
 
   Definition read_reg : function R Sigma := <{
   fun read_reg (select : bits_t 1) : bits_t 64 =>
@@ -724,6 +808,30 @@ Module Type Tests.
   Definition test_struct_init_empty : _action := <{
     struct numbers_s::{ }
   }>.
+
+  Definition some_arr := {|
+    array_len := 5;
+    array_type := bits_t 2
+  |}.
+
+  Definition test_cast1 : action R Sigma (tau := enum_t numbers_e) := <{
+    0b"001" : numbers_e
+  }>.
+  Definition test_cast2 : action R Sigma (tau := bits_t 3) := <{
+    numbers_e::<ONE> : bits
+  }>.
+  Definition test_cast3 : action R Sigma (tau := struct_t numbers_s) := <{
+    0b"001010011" : numbers_s
+  }>.
+  Definition test_cast4 : action R Sigma (tau := bits_t 9) := <{
+    numbers_s::{ } : bits
+  }>.
+  Definition test_cast5 : action R Sigma (tau := array_t some_arr) := <{
+    0b"1001001101" : some_arr
+  }>.
+  Definition test_cast6 : action R Sigma (tau := bits_t 10) := <{
+    0b"1001001101" : some_arr : bits
+  }>.
 End Tests.
 Module Type Tests2.
   Inductive reg_t :=
@@ -769,8 +877,13 @@ Module Type Tests2.
       if first < second then first else second
     }>.
 
+  Definition test_select : function R Sigma := <{
+    fun sel (v : bits_t 4) : bits_t 2 =>
+      v[0b"01"] ++ v[0b"11"]
+  }>.
+
   Definition idk : _action := <{
-    (!read0(data0))[Ob~1~1~1 :+ 3]
+    (read0(data0))[Ob~1~1~1 :+ 3]
   }>.
   
   Definition idk2 : _action := <{
@@ -781,7 +894,7 @@ Module Type Tests2.
       ) else pass);
     fail
   }>.
-  Program Definition test_27 : _action := <{
+  Definition test_27 : _action := <{
     ignore(if (!read0(data0))[#(Bits.of_nat _ 0) :+ 1] then (
       write0(data0, 0b"01101");
       let yo := if (Ob~1) then 0b"1001" else 0x"F" in
@@ -825,18 +938,16 @@ Module Type Tests2.
       ("two"  , bits_t 3) ]
   |}.
 
-  Program Definition test_get : function R Sigma := <{
+  Definition test_get : function R Sigma := <{
     fun idk (num : struct_t some_s) : bits_t 3 =>
       get(num, one)
   }>.
-  Fail Next Obligation.
 
-  Program Definition test_subst : function R Sigma := <{
+  Definition test_subst : function R Sigma := <{
     fun idk (num : struct_t some_s) : struct_t some_s =>
       subst(num, one, Ob~1~0~0)
   }>.
-  Fail Next Obligation.
-  
+
   Notation "'[|' a '=koika=' b '|]'" := ((a : _action) = (b : _action)) (a custom koika_t, b custom koika_t).
 
   (* sequences in match statements without paranthesis *)
