@@ -26,21 +26,24 @@ Definition fn_name_t := string.
 (* TODO: pos_t is set to unit just like in Frontent.v - does that make sense?  *)
 
 Definition action'
-  {tau sig reg_t ext_fn_t}
+  {reg_t ext_fn_t}
   (R : reg_t -> type)
-  (Sigma: ext_fn_t -> ExternalSignature) :=
+  (Sigma: ext_fn_t -> ExternalSignature) 
+  {sig tau} :=
     (TypedSyntax.action pos_t var_t fn_name_t R Sigma sig tau).
 
 Definition action
-  {tau reg_t ext_fn_t}
+  {reg_t ext_fn_t}
   (R : reg_t -> type)
-  (Sigma: ext_fn_t -> ExternalSignature) :=
-    (TypedSyntax.action pos_t var_t fn_name_t R Sigma [] tau).
+  (Sigma: ext_fn_t -> ExternalSignature)
+  {tau} :=
+  action' (sig := []) (tau := tau) R Sigma.
 
 Definition function
-  {tau sig reg_t ext_fn_t}
+  {reg_t ext_fn_t}
   (R : reg_t -> type)
-  (Sigma: ext_fn_t -> ExternalSignature) :=
+  (Sigma: ext_fn_t -> ExternalSignature)
+  {sig tau} :=
     Types.InternalFunction' fn_name_t
       (TypedSyntax.action pos_t var_t fn_name_t R Sigma sig tau).
 
@@ -60,6 +63,10 @@ Definition function
  * going to be something like `5 = 1 + 4`, which should be prooven
  * by simply using reflexivity `eq_refl`.
  *)
+(* Everywhere where a certain tau is expected, we need to use `tau_eq`
+ * to prevent type errors
+ * e.g. on the condition of the if statement
+ *)
 Local Definition proof_tau_eq' {sig tau_in tau_out} {reg_t ext_fn_t}
   {R : reg_t -> type} {Sigma : ext_fn_t -> ExternalSignature}
   (a : action' R Sigma (tau := tau_in) (sig := sig))
@@ -68,8 +75,15 @@ Local Definition proof_tau_eq' {sig tau_in tau_out} {reg_t ext_fn_t}
     match proof with
     | eq_refl => a
     end.
-Arguments proof_tau_eq' {sig tau_in tau_out} {reg_t ext_fn_t} {R Sigma} a & proof : assert.
+Arguments proof_tau_eq' {sig tau_in tau_out} {reg_t ext_fn_t} {R Sigma} & a proof : assert.
 Notation tau_eq a := (proof_tau_eq' a eq_refl).
+
+Local Definition proof_mem_eq {K} {sig} {k1 k2 : K} (m : member k1 sig) (proof : k1 = k2) : member k2 sig :=
+    match proof with
+    | eq_refl => m
+    end.
+Arguments proof_mem_eq {K} {sig} {k1 k2} m & proof : assert.
+Notation mem_eq m := (proof_mem_eq m eq_refl).
 
 Declare Custom Entry koika_t.
 
@@ -82,12 +96,82 @@ Declare Custom Entry koika_t_var.
 Notation "a" := (ident_to_string a) (in custom koika_t_var at level 0, a ident, only parsing).
 Notation "a" := (a) (in custom koika_t_var at level 0, a ident, format "'[' a ']'", only printing).
 
+
 (* TODO better error messages *)
 (* TODO explain why this class is necessary in the first place *)
-Class VarRef {var_t} {tau : type} (k: var_t) sig := var_ref : member (k, tau) sig.
-Hint Mode VarRef + - + + : typeclass_instances.
-Arguments var_ref {var_t tau} k sig {VarRef} : assert.
+
+
+(* Definition var_ref_opt (k: var_t) sig : member (k, match assoc k sig with
+| Some a => a.1
+| None => unit_t
+end) sig :=
+  match assoc k sig as e return
+    match e with
+    | Some a => member (k, a.1) sig
+    | None => unit_t
+    end
+  with
+  | Some a => a.2
+  | None => Ob
+  end. *)
+
+
+(* Variable references
+ *
+ * In untyped koika a variable reference is simply a `var_t`
+ * (or in other words: a `string`). There is no need that the
+ * name is even declared before. Then by type checking all
+ * declerations are collected in a `list` called `sig`. This
+ * list consists of pairs `var_t * type` with a name and a
+ * type for each variable.
+ *
+ * Now, if the type checker finds a variable reference (consisting
+ * only of a name), its name is searched in this list and a member
+ * proof is saved in the typed variable reference. This proof
+ * shows that the given reference has been declared bevore. (If
+ * the name can't be found and the proof can't be constructed type
+ * checking fails)
+ *
+ * For the typed koika parser a first approach to variable
+ * references was using type classes like this:
+ *
+ * ```
+ * Class VarRef {var_t} {tau : type} (k: var_t) sig := var_ref : member (k, tau) sig.
+ * Hint Mode VarRef + - + + : typeclass_instances.
+ * Arguments var_ref {var_t tau} k sig {VarRef} : assert.
+ * Hint Extern 1 (VarRef ?k ?sig) => exact (projT2 (must (assoc k sig))) : typeclass_instances.
+ *
+ * Notation "a" := (Var (var_ref (ident_to_string a) _))
+ *  (in custom koika_t at level 0, a constr at level 0, only parsing).
+ * ```
+ * 
+ * This typeclass does the following: it gives us a function
+ * `var_ref` which receives a `sig` and a name `k` and it returns
+ * a member proof, that this name is part of the list, and there
+ * exists a certain `tau` as type of this variable. (In this case
+ * if the name cannot be found `assoc` is going to return `None`
+ * therefore `must` returns `tt` and the tactic will fail. Thus,
+ * no typclass instance could be constructed and type checking
+ * fails)
+ *)
+(* Inductive member2 {K: Type}: list K -> K -> Type :=
+| Member2Hd: forall k sig, member2 (k :: sig) k
+| Member2Tl: forall k k' sig, member2 sig k -> member2 (k' :: sig) k. *)
+
+Class VarRef (k: var_t) sig := var_ref : member (k, match assoc k sig with
+| Some a => a.1
+| None => unit_t
+end) sig.
+Hint Mode VarRef + + : typeclass_instances.
+Arguments var_ref k & sig {VarRef} : assert.
 Hint Extern 1 (VarRef ?k ?sig) => exact (projT2 (must (assoc k sig))) : typeclass_instances.
+
+(* Get the instance out of an optional
+ *)
+Class MustClass {A} (o : option A) := must_class : A.
+Hint Mode MustClass + + : typeclass_instances.
+Arguments must_class {A} o {MustClass} : assert.
+Hint Extern 1 (MustClass ?o) => exact (must o) : typeclass_instances.
 
 (* Koika_types *)
 (* TODO improve arg list to be more consistent on nil case  *)
@@ -116,6 +200,7 @@ Local Definition refine_sig_tau sig tau {reg_t ext_fn_t}
   (a : action' R Sigma (tau := tau) (sig := sig)) : action' R Sigma := a.
 Arguments refine_sig_tau sig tau {reg_t ext_fn_t} {R Sigma} & a : assert.
 
+(* TODO prevent unfolding of functions on simpl/cbn - Arguments : simpl never ??*)
 Notation "'fun' nm args ':' ret '=>' body" :=
   (Build_InternalFunction' nm%string (refine_sig_tau args ret body))
     (in custom koika_t at level 200, nm custom koika_t_var, args custom koika_t_binder, ret constr at level 0, right associativity, format "'[v' 'fun'  nm  args  ':'  ret  '=>' '/' body ']'").
@@ -163,15 +248,15 @@ Notation "a  '>='  b"  := (Binop (Bits2 (Compare false cGe _)) a b) (in custom k
 Notation "a  '>s='  b" := (Binop (Bits2 (Compare true  cGe _)) a b) (in custom koika_t at level 79).
 
 (* Bit concatenation / shifts *)
-Notation "a  '++'  b"  := (tau_eq (Binop (Bits2 (Concat _ _))          a b)) (in custom koika_t at level 75).
-Notation "a  '>>'  b"  :=         (Binop (Bits2 (Lsr _ _))             a b)  (in custom koika_t at level 74).
-Notation "a  '>>>'  b" :=         (Binop (Bits2 (Asr _ _))             a b)  (in custom koika_t at level 74).
-Notation "a  '<<'  b"  :=         (Binop (Bits2 (Lsl _ _))             a b)  (in custom koika_t at level 74).
+Notation "a  '++'  b"  := (Binop (Bits2 (Concat _ _))          a b) (in custom koika_t at level 75).
+Notation "a  '>>'  b"  := (Binop (Bits2 (Lsr _ _))             a b)  (in custom koika_t at level 74).
+Notation "a  '>>>'  b" := (Binop (Bits2 (Asr _ _))             a b)  (in custom koika_t at level 74).
+Notation "a  '<<'  b"  := (Binop (Bits2 (Lsl _ _))             a b)  (in custom koika_t at level 74).
 
 (* Arithmetic *)
-Notation "a  '+'  b"   :=         (Binop (Bits2 (Plus     _))          a b)  (in custom koika_t at level 70).
-Notation "a  '-'  b"   :=         (Binop (Bits2 (Minus    _))          a b)  (in custom koika_t at level 70).
-Notation "a  '*'  b"   := (tau_eq (Binop (Bits2 (Mul    _ _))          a b)) (in custom koika_t at level 69).
+Notation "a  '+'  b"   := (Binop (Bits2 (Plus     _))          a b) (in custom koika_t at level 70).
+Notation "a  '-'  b"   := (Binop (Bits2 (Minus    _))          a b) (in custom koika_t at level 70).
+Notation "a  '*'  b"   := (Binop (Bits2 (Mul    _ _))          a b) (in custom koika_t at level 69).
 
 (* Unary operators *)
 Notation "'!' a"       := (Unop  (Bits1 (Not _))               a  ) (in custom koika_t at level 65, format "'!' a").
@@ -189,7 +274,7 @@ Arguments type_of_sig {sig} s {TypeOfSig} : assert.
 Notation "expr : sig" := (Unop (Conv (type_of_sig sig) Unpack) expr)
   (in custom koika_t at level 2, sig constr at level 0).
 
-Notation "expr : 'bits'" := (tau_eq (Unop (Conv _ Pack) expr))
+Notation "expr : 'bits'" := (Unop (Conv _ Pack) expr)
   (in custom koika_t at level 2).
 
 (* for some reason, using struct_idx coq can infer the parameter
@@ -230,56 +315,28 @@ Notation "'#' s" := (Const (tau := bits_t _) s) (in custom koika_t at level 0, s
  *   Some of the literal notations also start with an identifier.
  *   Thus, the same restrictions apply.
  *)
-(* Literal parsing
- *
- * The arguably nicest syntax for literals would be something like
- * 0b0110 for binary and 0xc0ffee for hexadecimal.
- * However, there are several challanges which make it hard to use these
- * Notations. I try to go over them step by step.
- *
- * First, what if we try to define notations with these prefixes? like:
- * "'0b' num" and "'0x' num" ? Then we get a problem with the hexadecimal
- * numbers because we would like 'num' to be either something coq would parse
- * as a number like 09385 or something coq would parse as an identifier like
- * c0ffee or even something coq wouldn't parse like 09c0ffee, so that doesn't
- * work. We could try to get around the problem by letting num be a string
- * and then parsing that string ourself with a function (string -> bits _).
- * That solution actually works, however, it doesn't look that nice 0x"8afe80"
- *
- * Defining own notations to parse hexadecimals character by character doesn't
- * work either since these notations must be entered seperated by a symbol or
- * whitespace so we would need to enter something like: '0x 9 c 0 f f e' or
- * '0x~9~c~0~f~f~e'. This is extremely annoying to type and thus inacceptable.
- *
- * Note: Coq's parser actually can parse hexadecimals, but these are expected
- *   to always be prefixed by '0x' (in other words: coq parses the prefix as
- *   part of the number itself, thus it cannot be part of our notation)
- *
- * So going back to the previous example, it would actually be possible to parse
- * 0b01101 using a custom 'Number Notation' for decimal and 0x0xC0FFEE. Yes we
- * would need a double 0x prefix -> the first for our syntax to start parsing a
- * number, the second for coq's number parsing, to tells it's a hexadecimal.
- * To cut the first 0x of our notations off, we would need to parse "num". So
- * basically a 'catch-all'-notation parsing numbers. However the problem here
- * is that we already have a 'catch-all'-notation for our variables that are
- * parsed as constr, so the parser won't let us define that notation.
- *
- * TODO:
- *   At this point it might be possible to use the same Notation for the hex-
- *   numbers and the variables together with some ltac-magic to distinguish if
- *   a number was parsed or nat. However, I wasn't able to pull that off so far.
- *
- * Despite this ^ possibility there are basically 2 options. First: use a prefix
- * and coq's built-in parsing like $0b0110 and $0xc0ffee or parse numbers as
- * identifiers and convert them to strings which are then parsed to bit vectors.
- * For that we could use the same Notation parsing variables and numbers and
- * distinguish them later by their prefix. E.g. numbers starting with Ox and Ob
- * everthing else is a variable (note that these Notations start with an O
- * instead of a 0 to let coq parse them as an ident instead of a number, e.g.
- * Ox9C0FFE is a totally valid ident for coq)
- *)
-Notation "a" := (Var (var_ref (ident_to_string a) _)) (in custom koika_t at level 0, a constr at level 0, only parsing).
+(* Definition Var 
+  {reg_t ext_fn_t}
+  {R : reg_t -> type}
+  {Sigma : ext_fn_t -> ExternalSignature}
+  {sig} (k: var_t) : action' R Sigma (sig := sig) (tau := (must_class (assoc k _)).1). *)
+Notation "a" := (Var (k := ident_to_string a) _) (in custom koika_t at level 0, a constr at level 0, only parsing).
+(* Notation "a" := (Var (mem_eq (var_ref (ident_to_string a) _))) (in custom koika_t at level 0, a constr at level 0, only parsing). *)
 Notation "a" := (Var a) (in custom koika_t at level 0, a constr at level 0, only printing).
+
+Existing Class member.
+#[export] Existing Instance MemberHd.
+#[export] Existing Instance MemberTl.
+
+(* TODO:
+One last suggestion, add this to avoid infinite loops when the list is accidentally left unspecified:
+Hint Mode In ! ! ! : typeclass_instances.
+*)
+
+(* Definition test : member ("a", _) [("a", nat)] := _.
+Definition test' : member ("a", _) [("a", nat); ("b", bool)] := _.
+Definition test'' : member ("a", _) [("b", nat); ("a", bool)] := _.
+Definition test'' : member ("a", _) [("b", nat); ("c", bool)] := _. *)
 
 (* Alternative shorter set syntax
  * Note: expr is level 89 to stay below ';' *)
@@ -336,12 +393,8 @@ Notation "'unpack(' t ',' v ')'"     := (Unop (Conv t Unpack)     v) (in custom 
 
 Notation "'extcall' method '(' arg ')'" := (ExternalCall method arg) (in custom koika_t, method constr at level 0).
 
-Notation "'get' '(' v ',' f ')'" :=
-  (tau_eq (Unop  (Struct1 GetField   _ (struct_idx _ f)) v))
-  (in custom koika_t, f custom koika_t_var, format "'get' '(' v ','  f ')'").
-
 Notation "'subst' '(' v ',' f ',' a ')'" :=
-  (Binop (Struct2 SubstField _ (struct_idx _ f)) v (tau_eq a))
+  (Binop (Struct2 SubstField _ (struct_idx _ f)) v a)
   (in custom koika_t, f custom koika_t_var, format "'subst' '(' v ','  f ',' a ')'").
 
 Notation "'getbits@' sig '(' v ',' f ')'" :=
@@ -368,13 +421,19 @@ Notation "arg1 '|' arg2" := (arg1 ++ arg2) (in custom koika_t_branches at level 
 (* For example if var has enum type then allow special match with 
 member names instead of `type::<mem>` and with optional default case
 
+Notation "enum_match" ? or a special case on "match v : enum_..."?
+What happens when i have an enum defining only 00 and 01 and i take
+a bitvector of 10 and cast it to the enum ... with the current syntax
+thats possible -- but should that be legal?
 *)
+(* TODO move to macros *)
+
 Fixpoint macro_switch
   {reg_t ext_fn_t} {R: reg_t -> type} {Sigma: ext_fn_t -> ExternalSignature}
-  {sig tau tau_eq}
-  (var: action' (tau := tau_eq) R Sigma)
+  {sig tau tau_arg}
+  (var: action' (tau := tau_arg) R Sigma)
   (default: action' (tau := tau) R Sigma)
-  (branches: list (action' (tau := tau_eq) R Sigma * action' (tau := tau) (sig := sig) R Sigma))
+  (branches: list (action' (tau := tau_arg) R Sigma * action' (tau := tau) (sig := sig) R Sigma))
     : action' (tau := tau) (sig := sig) R Sigma :=
   match branches with
   | nil => default
@@ -418,6 +477,54 @@ Ltac bits_of_N default val :=
 (* TODO maybe parse numbers like this *)
 (* Check (ident_to_string Ob001100). *)
 
+(* Literal parsing
+ *
+ * The arguably nicest syntax for literals would be something like
+ * 0b0110 for binary and 0xc0ffee for hexadecimal.
+ * However, there are several challanges which make it hard to use these
+ * Notations. I try to go over them step by step.
+ *
+ * First, what if we try to define notations with these prefixes? like:
+ * "'0b' num" and "'0x' num" ? Then we get a problem with the hexadecimal
+ * numbers because we would like 'num' to be either something coq would parse
+ * as a number like 09385 or something coq would parse as an identifier like
+ * c0ffee or even something coq wouldn't parse like 09c0ffee, so that doesn't
+ * work. We could try to get around the problem by letting num be a string
+ * and then parsing that string ourself with a function (string -> bits _).
+ * That solution actually works, however, it doesn't look that nice 0x"8afe80"
+ *
+ * Defining own notations to parse hexadecimals character by character doesn't
+ * work either since these notations must be entered seperated by a symbol or
+ * whitespace so we would need to enter something like: '0x 9 c 0 f f e' or
+ * '0x~9~c~0~f~f~e'. This is extremely annoying to type and thus inacceptable.
+ *
+ * Note: Coq's parser actually can parse hexadecimals, but these are expected
+ *   to always be prefixed by '0x' (in other words: coq parses the prefix as
+ *   part of the number itself, thus it cannot be part of our notation)
+ *
+ * So going back to the previous example, it would actually be possible to parse
+ * 0b01101 using a custom 'Number Notation' for decimal and 0x0xC0FFEE. Yes we
+ * would need a double 0x prefix -> the first for our syntax to start parsing a
+ * number, the second for coq's number parsing, to tells it's a hexadecimal.
+ * To cut the first 0x of our notations off, we would need to parse "num". So
+ * basically a 'catch-all'-notation parsing numbers. However the problem here
+ * is that we already have a 'catch-all'-notation for our variables that are
+ * parsed as constr, so the parser won't let us define that notation.
+ *
+ * TODO:
+ *   At this point it might be possible to use the same Notation for the hex-
+ *   numbers and the variables together with some ltac-magic to distinguish if
+ *   a number was parsed or not. However, I wasn't able to pull that off so far.
+ *
+ * Despite this ^ possibility there are basically 2 options. First: use a prefix
+ * and coq's built-in parsing like $0b0110 and $0xc0ffee or parse numbers as
+ * identifiers and convert them to strings which are then parsed to bit vectors.
+ * For that we could use the same Notation parsing variables and numbers and
+ * distinguish them later by their prefix. E.g. numbers starting with Ox and Ob
+ * everthing else is a variable (note that these Notations start with an 'O'
+ * instead of a '0' to let coq parse them as an ident instead of a number, e.g.
+ * Ox9C0FFE is a totally valid ident for coq)
+ *)
 Notation "num ':b' sz" := (Const (tau := bits_t  _)      (Bits.of_N (sz <: nat)            (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0, sz constr at level 0, only parsing).
 Notation "num ':b'"    := (Const (tau := bits_t  _) ltac:(bits_of_N ((len num) * 1)        (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0,                       only parsing).
 Notation "'0b' num sz" := (Const (tau := bits_t sz)      (Bits.of_N (sz <: nat)            (bin_string_to_N num))) (in custom koika_t at level 0, num constr at level 0, sz constr at level 0, format "'0b' num sz").
@@ -605,7 +712,7 @@ End BidirectionalityHintsTest.
 
 (* Nothing needs to be inferred from the context  *)
 Arguments Fail         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} tau & : assert.
-Arguments Var          {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & {k tau} m : assert.
+Arguments Var {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} {k tau} m : assert.
 Arguments Const        {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} & cst : assert.
 Arguments Assign       {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & {k tau} m ex : assert.
 Arguments Seq          {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} & r1 r2 : assert.
@@ -619,7 +726,7 @@ Arguments ExternalCall {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & 
 Arguments InternalCall {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} {argspec} & fn args : assert.
 Arguments APos         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} & pos a : assert.
 Arguments Build_InternalFunction' {fn_name_t action} & int_name int_body : assert.
-Arguments macro_switch {reg_t ext_fn_t} {R Sigma} {sig} & {tau tau_eq} var default branches : assert.
+Arguments macro_switch {reg_t ext_fn_t} {R Sigma} {sig} & {tau tau_arg} var default branches : assert.
 Arguments struct_init {reg_t ext_fn_t} {R Sigma} {sig} & s_sig fields : assert.
 
 (* TODO: what does this? *)
@@ -629,48 +736,6 @@ Arguments struct_init {reg_t ext_fn_t} {R Sigma} {sig} & s_sig fields : assert.
 (* ========================================================================= *)
 (*                                   Tests                                   *)
 (* ========================================================================= *)
-
-(* Ltac eval_cbn x :=
-  eval cbn in x.
-Ltac eval_hnf x :=
-  eval hnf in x.
-Ltac eval_cbv x :=
-  eval cbv in x.
-Ltac eval_vm_compute x :=
-  eval vm_compute in x.
-Ltac eval_native_compute x :=
-  eval native_compute in x. *)
-
-(* Ltac eval_type' x :=
-  let t := type of x in
-  let t' := eval vm_compute in t in
-  constr:(x: t').
-
-Notation eval_type t :=
-  ltac:(let t := eval_type' t in
-        exact t) (only parsing).
-(* unify with action'? *)
-Notation eval_type_act act :=
-  ((fun {t} (a : action' _ _ (tau := t)) =>
-  ltac:(let t := eval_type' t in
-        exact t)) _ act) (only parsing).
-*)
-(* Section Macro.
-  Context {reg_t ext_fn_t: Type}.
-  Context {R : reg_t -> type}.
-  Context {Sigma: ext_fn_t -> ExternalSignature}.
-  Definition idk2 := eval_type idk.
-    
-  Definition idk2 := idk : ltac:(
-    let T := type of idk in
-    let T' := eval vm_compute in T in exact (T')
-    (* match T with
-    | action _ _ (tau := ?t) => simpl T; exact (T)
-    end *)
-  ). *)
-
-(* Set Printing Implicit. Check (<{0b"011" && 0b"110"}> : action _ _ ).
-Set Printing Implicit. Check (<{0b"011" && 0b"110"}> : action _ _ (tau := bits_t 3)). *)
 
 Module Tests'.
 Section Tests'.
@@ -693,13 +758,27 @@ Section Tests'.
   Context {Sigma : ext_fn_t -> ExternalSignature}.
 
   Definition test_concatenation : action' R' Sigma (sig := [("yo", bits_t 4)]) := <{
-    write0(reg2, 0b"1"1 ++ read0(reg3));
+    write0(reg2, `tau_eq <{0b"1"1 ++ read0(reg3)}>`);
   }>.
 
-  Definition read_reg : function R Sigma := <{
+  Definition idk5 : @TypedSyntax.action unit string string _ _ R Sigma [("a", R' reg3)] (bits_t 4) := (@Var _ _ _ _ _ _ _ [("a", R' reg3)] "a" (_) (must_class (assoc "a" _)).2).
+  
+  Arguments Var {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & {k tau} m : assert.
+
+  Definition idk6 : @TypedSyntax.action unit string string _ _ R Sigma [("a", R' reg3)] (bits_t 4) := Var (k := "a") _.
+
+  Definition read_reg : action' R' Sigma (sig := [("a", R' reg3)]) (tau := bits_t 4) := <{
+    a
+  }>.
+  Definition read_reg2 : function R' Sigma := <{
+  fun read_reg () : bits_t 4 =>
+    let a := if 0b"0" then read0(reg3) else 0b"1010" in
+    a
+  }>.
+  Definition read_reg3 : (* action' R Sigma (sig:= [("select", bits_t 1)]) (tau := bits_t 64) *) function R Sigma := <{
   fun read_reg (select : bits_t 1) : bits_t 64 =>
     let data :=
-      if select
+      if `tau_eq <{select}>`
       then read0(reg1)
       else read0(reg0)
     in data
@@ -817,21 +896,21 @@ Module Type Tests.
   Definition test_cast1 : action R Sigma (tau := enum_t numbers_e) := <{
     0b"001" : numbers_e
   }>.
-  Definition test_cast2 : action R Sigma (tau := bits_t 3) := <{
-    numbers_e::<ONE> : bits
-  }>.
+  (* Definition test_cast2 : action R Sigma (tau := bits_t 3) := <{ *)
+    (* numbers_e::<ONE> : bits *)
+  (* }>. *)
   Definition test_cast3 : action R Sigma (tau := struct_t numbers_s) := <{
     0b"001010011" : numbers_s
   }>.
-  Definition test_cast4 : action R Sigma (tau := bits_t 9) := <{
-    numbers_s::{ } : bits
-  }>.
+  (* Definition test_cast4 : action R Sigma (tau := bits_t 9) := <{ *)
+    (* numbers_s::{ } : bits *)
+  (* }>. *)
   Definition test_cast5 : action R Sigma (tau := array_t some_arr) := <{
     0b"1001001101" : some_arr
   }>.
-  Definition test_cast6 : action R Sigma (tau := bits_t 10) := <{
-    0b"1001001101" : some_arr : bits
-  }>.
+  (* Definition test_cast6 : action R Sigma (tau := bits_t 10) := <{ *)
+    (* 0b"1001001101" : some_arr : bits *)
+  (* }>. *)
 End Tests.
 Module Type Tests2.
   Inductive reg_t :=
@@ -872,15 +951,15 @@ Module Type Tests2.
 
   Definition min {reg_t ext_fn_t : Type} {R : reg_t -> type}
     {Sigma : ext_fn_t -> ExternalSignature}
-    (bit_size : nat) : function R Sigma := <{
-    fun min (first: bits_t bit_size) (second: bits_t bit_size) : bits_t bit_size =>
-      if first < second then first else second
+    (sz : nat) : function R Sigma := <{
+    fun min (a: bits_t sz) (b: bits_t sz) : bits_t sz =>
+      if a < b then a else b
     }>.
 
-  Definition test_select : function R Sigma := <{
-    fun sel (v : bits_t 4) : bits_t 2 =>
-      v[0b"01"] ++ v[0b"11"]
-  }>.
+  (* Definition test_select : function R Sigma := <{ *)
+    (* fun sel (v : bits_t 4) : bits_t 2 => *)
+      (* v[0b"01"] ++ v[0b"11"] *)
+  (* }>. *)
 
   Definition idk : _action := <{
     (read0(data0))[Ob~1~1~1 :+ 3]
@@ -894,7 +973,7 @@ Module Type Tests2.
       ) else pass);
     fail
   }>.
-  Definition test_27 : _action := <{
+  (* Definition test_27 : _action := <{
     ignore(if (!read0(data0))[#(Bits.of_nat _ 0) :+ 1] then (
       write0(data0, 0b"01101");
       let yo := if (Ob~1) then 0b"1001" else 0x"F" in
@@ -902,8 +981,7 @@ Module Type Tests2.
       0b"00011"5
       ) else read0(data0));
     fail
-  }>.
-  Fail Next Obligation.
+  }>. *)
   Definition test_28 : _action := <{
     let var := 0b"101" in
     match var with
@@ -938,10 +1016,31 @@ Module Type Tests2.
       ("two"  , bits_t 3) ]
   |}.
 
+  (* Definition get
+  {reg_t ext_fn_t}
+  {R : reg_t -> type}
+  {Sigma : ext_fn_t -> ExternalSignature}
+  {sig ssig}
+  (v : @action' (struct_t ssig) sig _ _ R Sigma)
+  (f : var_t)
+  {si : StructIdx ssig f}
+  : @action' (field_type ssig (struct_idx ssig f)) sig _ _ R Sigma :=
+  (Unop (Struct1 GetField ssig (struct_idx ssig f)) v).
+
+  Arguments get {reg_t ext_fn_t} {R Sigma} {sig ssig} v f & {si} : assert. *)
+Notation "'get' '(' v ',' f ')'" :=
+  (* (get v f) *)
+  (tau_eq (Unop  (Struct1 GetField   _ (struct_idx _ f)) v))
+  (in custom koika_t, f custom koika_t_var, format "'get' '(' v ','  f ')'").
+
   Definition test_get : function R Sigma := <{
     fun idk (num : struct_t some_s) : bits_t 3 =>
       get(num, one)
   }>.
+  (* Definition test_get : function R Sigma := <{ *)
+    (* fun idk (num : struct_t some_s) : bits_t 10 => *)
+     (* zeroExtend(num.[one], 10) *)
+  (* }>. *)
 
   Definition test_subst : function R Sigma := <{
     fun idk (num : struct_t some_s) : struct_t some_s =>
