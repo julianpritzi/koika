@@ -84,8 +84,8 @@ Notation "a ';'"   := (cons a nil) (in custom koika_struct_literal at level 0, a
 Notation "a"       := (cons a nil) (in custom koika_struct_literal at level 0, a custom koika_struct_literal_field).
 
 (*
-The notations which start directly with a variable need to be at level 1
-else they interfere with the notations in koika.
+The notations which start directly with a variable need to be at least on
+level 1 else they interfere with the notations in koika.
 E.g.
   `struct sig ::{ ... }` in koika parses sig as constr 0, but
   if the syntax sig ::{ } is in constr 0, then the braces will
