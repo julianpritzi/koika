@@ -336,3 +336,8 @@ Notation ident_to_string a :=
 
 Notation binder_to_string body a :=
   (TacInTerm.binder_to_string body a) (only parsing).
+
+Declare Custom Entry koika_ident.
+Notation "a" := (TC.ident_to_string a : string) (in custom koika_ident at level 0, a ident, only parsing).
+Notation "a" := (a) (in custom koika_ident at level 0, a ident, format "'[' a ']'", only printing).
+Export (hints) TC.
