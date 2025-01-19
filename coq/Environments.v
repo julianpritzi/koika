@@ -433,12 +433,13 @@ Lemma equiv_refl {K} (E: Env K) {V: esig K} (ev: E.(env_t) V) :
 Proof. firstorder. Qed.
 
 Lemma equiv_eq {K} (E: Env K) {V: esig K} (ev1 ev2: E.(env_t) V) :
-  equiv E ev1 ev2 ->
+  equiv E ev1 ev2 <->
   ev1 = ev2.
 Proof.
-  intros.
-  rewrite <- (E.(create_getenv_id) ev1), <- (E.(create_getenv_id) ev2).
-  apply create_funext; assumption.
+  split.
+  - intros. rewrite <- (E.(create_getenv_id) ev1), <- (E.(create_getenv_id) ev2).
+    apply create_funext; assumption.
+  - now intros [] k.
 Qed.
 
 Definition update {K} (E: Env K) {V: esig K}
