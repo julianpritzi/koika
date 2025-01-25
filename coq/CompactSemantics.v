@@ -84,7 +84,7 @@ Section Interp.
         else
           interp_action Gamma sched_log action_log fbranch
       | Read P0 idx => fun Gamma =>
-        if may_read0 sched_log idx then
+        if may_read0 sched_log action_log idx then
           Some (Environments.update
                   REnv action_log idx
                   (fun rl => {| lread0 := true; lread1 := rl.(lread1);
@@ -93,7 +93,7 @@ Section Interp.
                 Gamma)
         else None
       | Read P1 idx => fun Gamma =>
-        if may_read1 sched_log idx then
+        if may_read1 sched_log action_log idx then
           Some (Environments.update
                   REnv action_log idx
                   (fun rl => {| lread0 := rl.(lread1); lread1 := true;

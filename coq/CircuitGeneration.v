@@ -81,12 +81,12 @@ Section CircuitCompilation.
     context (fun sz => circuit sz) sig.
 
   Definition mux_rwdata {sz} an (cond: circuit 1) (tReg fReg: @rwdata sz) :=
-    {| read0 := CMuxAnnotOpt an cond (tReg.(read0)) (fReg.(read0));
-       read1 := CMuxAnnotOpt an cond (tReg.(read1)) (fReg.(read1));
+    {| read0  := CMuxAnnotOpt an cond (tReg.(read0))  (fReg.(read0));
+       read1  := CMuxAnnotOpt an cond (tReg.(read1))  (fReg.(read1));
        write0 := CMuxAnnotOpt an cond (tReg.(write0)) (fReg.(write0));
        write1 := CMuxAnnotOpt an cond (tReg.(write1)) (fReg.(write1));
-       data0 := CMuxAnnotOpt an cond (tReg.(data0)) (fReg.(data0));
-       data1 := CMuxAnnotOpt an cond (data1 tReg) (data1 fReg) |}.
+       data0  := CMuxAnnotOpt an cond (tReg.(data0))  (fReg.(data0));
+       data1  := CMuxAnnotOpt an cond (tReg.(data1))  (fReg.(data1)) |}.
 
   Definition mux_rwsets an (cond: circuit 1) (tRegs fRegs: rwset) :=
     map2 REnv (fun k treg freg => mux_rwdata an cond treg freg)
@@ -216,7 +216,9 @@ Section CircuitCompilation.
       | Read P0 idx => fun Gamma =>
         let reg := REnv.(getenv) clog.(regs) idx in
         ({| retVal := REnv.(getenv) cr idx;
-           erwc := {| canFire := clog.(canFire);
+            erwc := {| canFire := (clog.(canFire) &&`"read0_canFire"`
+                                  !`"no_write0"` reg.(write0) &&`"read0_canFire"`
+                                  !`"no_write1"` reg.(write1));
                      regs := REnv.(putenv) clog.(regs) idx {| read0 := $`"read0"` Ob~1;
                                                              (* Unchanged *)
                                                              read1 := reg.(read1);
@@ -228,7 +230,8 @@ Section CircuitCompilation.
       | Read P1 idx => fun Gamma =>
         let reg := REnv.(getenv) clog.(regs) idx in
         ({| retVal := reg.(data0);
-            erwc := {| canFire := clog.(canFire);
+            erwc := {| canFire := (clog.(canFire) &&`"read1_canFire"`
+                                  !`"no_write1"` reg.(write1));
                       regs := REnv.(putenv) clog.(regs) idx {| read1 := $`"read1"` Ob~1;
                                                               (* Unchanged *)
                                                               read0 := reg.(read0);
@@ -290,11 +293,11 @@ Section CircuitCompilation.
   Definition adapter (cs: scheduler_circuit) : rwcircuit :=
     {| canFire := $`"cF_init"` Ob~1;
        regs := map REnv (fun k reg => {| read0 := $`"init_no_read0"` Ob~0;
-                                       read1 := $`"init_no_read1"` Ob~0;
-                                       write0 := $`"init_no_write0"` Ob~0;
-                                       write1 := $`"init_no_write1"` Ob~0;
-                                       data0 := reg.(data0);
-                                       data1 := reg.(data1) |})
+                                         read1 := $`"init_no_read1"` Ob~0;
+                                         write0 := $`"init_no_write0"` Ob~0;
+                                         write1 := $`"init_no_write1"` Ob~0;
+                                         data0 := reg.(data0);
+                                         data1 := reg.(data1) |})
                          cs |}.
 
   Definition willFire_of_canFire'_read0 {sz} (ruleReg inReg: @rwdata sz) :=

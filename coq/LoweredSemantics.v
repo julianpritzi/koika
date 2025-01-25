@@ -55,7 +55,7 @@ Section Interp.
         else
           interp_action Gamma sched_log action_log fbranch
       | Read prt idx => fun Gamma =>
-        if may_read sched_log prt idx then
+        if may_read sched_log action_log prt idx then
           Some (log_cons idx (LE LogRead prt tt) action_log,
                 match prt with
                 | P0 => REnv.(getenv) r idx

@@ -67,11 +67,11 @@ Section Logs.
 
   Open Scope bool_scope.
 
-  Definition may_read (sched_log: Log) prt idx :=
+  Definition may_read (sched_log rule_log: Log) prt idx :=
     match prt with
-    | P0 => negb (log_existsb sched_log idx is_write0) &&
-           negb (log_existsb sched_log idx is_write1)
-    | P1 => negb (log_existsb sched_log idx is_write1)
+    | P0 => negb (log_existsb (log_app rule_log sched_log) idx is_write0) &&
+           negb (log_existsb (log_app rule_log sched_log) idx is_write1)
+    | P1 => negb (log_existsb (log_app rule_log sched_log) idx is_write1)
     end.
 
   Definition log_latest_write0_fn {T} (le: @LogEntry T) :=

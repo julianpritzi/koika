@@ -263,11 +263,14 @@ Section LogMaps.
   Qed.
 
   Lemma may_read_log_map_values :
-    forall (l1: Log1) prt idx,
-      may_read (log_map_values f l1 : Log2) prt idx =
-      may_read l1 prt idx.
+    forall (L1 l1: Log1) prt idx,
+      may_read (log_map_values f L1 : Log2) (log_map_values f l1 : Log2) prt idx =
+      may_read L1 l1 prt idx.
   Proof.
-    unfold may_read; intros; rewrite !log_existsb_log_map_values; reflexivity.
+    unfold may_read; intros;
+    repeat setoid_rewrite log_map_values_log_app;
+      repeat setoid_rewrite log_existsb_log_map_values;
+      reflexivity.
   Qed.
 
   Lemma may_write_log_map_values :

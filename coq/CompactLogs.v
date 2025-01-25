@@ -45,16 +45,18 @@ Section Logs.
 
   Open Scope bool_scope.
 
-  Definition may_read0 (sched_log: Log) idx :=
-    match REnv.(getenv) sched_log idx with
-    | {| lread0 := _; lread1 := _; lwrite0 := None; lwrite1 := None |} => true
-    | _ => false
+  Definition may_read0 (sched_log rule_log: Log) idx :=
+    match REnv.(getenv) sched_log idx, REnv.(getenv) rule_log idx with
+    | {| lread0 := _; lread1 := _; lwrite0 := None; lwrite1 := None |},
+      {| lread0 := _; lread1 := _; lwrite0 := None; lwrite1 := None |} => true
+    | _, _ => false
     end.
 
-  Definition may_read1 (sched_log: Log) idx :=
-    match REnv.(getenv) sched_log idx with
-    | {| lread0 := _; lread1 := _; lwrite0 := _; lwrite1 := None |} => true
-    | _ => false
+  Definition may_read1 (sched_log rule_log: Log) idx :=
+    match REnv.(getenv) sched_log idx, REnv.(getenv) rule_log idx with
+    | {| lread0 := _; lread1 := _; lwrite0 := _; lwrite1 := None |},
+      {| lread0 := _; lread1 := _; lwrite0 := _; lwrite1 := None |} => true
+    | _, _ => false
     end.
 
   Definition may_write0 (sched_log rule_log: Log) idx :=
@@ -87,7 +89,7 @@ Arguments logentry_app {T} !l1 !l2 /: assert.
 Definition Log {reg_t} R REnv := @_Log reg_t (fun idx => type_denote (R idx)) REnv.
 Definition CLog {reg_t} R REnv := @_Log reg_t (fun idx => Bits.bits (R idx)) REnv.
 
-Arguments may_read0 {reg_t R REnv} !sched_log !idx /.
-Arguments may_read1 {reg_t R REnv} !sched_log !idx /.
+Arguments may_read0 {reg_t R REnv} !sched_log !rule_log !idx /.
+Arguments may_read1 {reg_t R REnv} !sched_log !rule_log !idx /.
 Arguments may_write0 {reg_t R REnv} !sched_log !rule_log !idx / : simpl nomatch.
 Arguments may_write1 {reg_t R REnv} !sched_log !rule_log !idx / : simpl nomatch.

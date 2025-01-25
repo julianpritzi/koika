@@ -130,7 +130,7 @@ Section CPS.
                       end)
       | Read P0 idx =>
         fun k Gamma l =>
-          if may_read0 L idx then
+          if may_read0 L l idx then
             k (Some (Environments.update
                        REnv l idx
                        (fun rl => {| lread0 := true; lread1 := rl.(lread1);
@@ -140,7 +140,7 @@ Section CPS.
           else k None
       | Read P1 idx =>
         fun k Gamma l =>
-          if may_read1 L idx then
+          if may_read1 L l idx then
             k (Some (Environments.update
                        REnv l idx
                        (fun rl => {| lread0 := rl.(lread1); lread1 := true;

@@ -189,9 +189,9 @@ Section LoweringCorrectness.
   Qed.
 
   Lemma log_equiv_may_read:
-    forall (tL: tlog) (port: Port) (idx: reg_t),
-      Logs.may_read tL port idx =
-      Logs.may_read (lower_log tL) port idx.
+    forall (tL tl: tlog) (port: Port) (idx: reg_t),
+      Logs.may_read tL tl port idx =
+      Logs.may_read (lower_log tL) (lower_log tl) port idx.
   Proof. intros; symmetry; apply may_read_log_map_values. Qed.
 
   Lemma log_equiv_may_write:

@@ -582,13 +582,13 @@ Section CompilerCorrectness.
     - destruct port; cbn; circuit_compile_destruct_t.
       (* Read0 *)
       + split.
-        * apply circuit_le_refl.
+        * circuit_le_f_equal. eauto using circuit_le_CAnd_l, circuit_le_CAnnot, circuit_le_opt_l, circuit_le_refl.
         * intros. eapply rwset_circuit_le_invariant_putenv.
           -- eauto using rwset_circuit_le_invariant_refl.
           -- red; cbn; eauto using circuit_le_true, circuit_le_refl, circuit_le_opt_r.
       (* Read1 *)
       + split.
-        * eauto using circuit_le_refl.
+        * circuit_le_f_equal. eauto using circuit_le_CAnd_l, circuit_le_CAnnot, circuit_le_opt_l, circuit_le_refl.
         * intros; apply rwset_circuit_le_invariant_putenv.
           -- eauto using rwset_circuit_le_invariant_refl.
           -- red; cbn; eauto using circuit_le_true, circuit_le_refl, circuit_le_opt_r.
@@ -1098,42 +1098,34 @@ Section CompilerCorrectness.
             try eapply action_compile_willFire_of_canFire'_decreasing;
             eauto.
     - (* Read *)
-      destruct port.
-      + cbn.
-        destruct (may_read Log P0 idx) eqn:?; cbn.
-        * repeat eapply conj.
-          -- eauto.
-          -- apply log_rwdata_consistent_log_cons_putenv;
-               [ eauto | red ]; cbn; rewrite ?Bits.single_cons, lco_proof; eauto.
-          -- apply log_data0_consistent_putenv_read_write1; eauto.
-          -- apply log_data1_consistent_putenv_read_write0; eauto.
-          -- interp_willFire_cleanup;
-               may_read_write_t.
-          -- intuition.
-        * interp_willFire_cleanup.
-          may_read_write_t.
-          right; exists idx;
-            interp_willFire_cleanup;
+      destruct port; t.
+      + repeat apply conj.
+        * eauto.
+        * (apply log_rwdata_consistent_log_cons_putenv;
+             [ eauto | red ]; cbn; rewrite ?Bits.single_cons, lco_proof; eauto).
+        * apply log_data0_consistent_putenv_read_write1; eauto.
+        * apply log_data1_consistent_putenv_read_write0; eauto.
+        * interp_willFire_cleanup;
+              may_read_write_t.
+        * trivial.
+      + interp_willFire_cleanup;
+            may_read_write_t; eauto.
+        * right; exists idx; interp_willFire_cleanup;
             may_read_write_t.
-          eauto.
-          right; exists idx;
-            interp_willFire_cleanup;
+        * right; exists idx; interp_willFire_cleanup;
             may_read_write_t.
-      + cbn.
-        destruct (may_read Log P1 idx) eqn:?; cbn.
-        * repeat eapply conj.
-          -- apply H1.
-          -- apply log_rwdata_consistent_log_cons_putenv;
-               [ eauto | red ]; cbn; rewrite ?Bits.single_cons, lco_proof; eauto.
-          -- apply log_data0_consistent_putenv_read_write1; eauto.
-          -- apply log_data1_consistent_putenv_read_write0; eauto.
-          -- interp_willFire_cleanup;
-               may_read_write_t.
-          -- intuition.
-        * interp_willFire_cleanup.
-          right.
-          eexists.
-          interp_willFire_cleanup.
+      + repeat eapply conj.
+        * apply H1.
+        * apply log_rwdata_consistent_log_cons_putenv;
+              [ eauto | red ]; cbn; rewrite ?Bits.single_cons, lco_proof; eauto.
+        * apply log_data0_consistent_putenv_read_write1; eauto.
+        * apply log_data1_consistent_putenv_read_write0; eauto.
+        * interp_willFire_cleanup;
+              may_read_write_t.
+        * intuition.
+      + interp_willFire_cleanup;
+          may_read_write_t; eauto.
+        right; exists idx; interp_willFire_cleanup;
           may_read_write_t.
     - (* Write *)
       destruct port; t.

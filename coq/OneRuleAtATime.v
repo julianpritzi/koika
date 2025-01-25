@@ -62,13 +62,16 @@ Section Proof.
            end.
 
   Lemma may_read_app_sl :
-    forall (sl sl': Log) prt idx,
-      may_read (log_app sl sl') prt idx =
-      may_read sl prt idx && may_read sl' prt idx.
+    forall (sl sl': Log) l prt idx,
+      may_read (log_app sl sl') l prt idx =
+      may_read sl l prt idx && may_read sl' l prt idx.
   Proof.
     unfold may_read; intros.
     destruct prt; rewrite !log_forallb_not_existsb, !log_forallb_app;
-      ring_simplify; f_equal.
+    repeat match goal with
+    | |- context[log_forallb ?l ?i ?f] => generalize (log_forallb l i f)
+    end;
+    repeat (let b := fresh "b" in intro b; destruct b); reflexivity.
   Qed.
 
   Lemma may_write_app_sl :
@@ -90,8 +93,8 @@ Section Proof.
     end.
 
   Lemma may_read0_no_writes :
-    forall (sl: Log) idx,
-      may_read sl P0 idx = true ->
+    forall (sl: Log) l idx,
+      may_read sl l P0 idx = true ->
       latest_write sl idx = None.
   Proof.
     unfold may_read; intros.
@@ -109,24 +112,20 @@ Section Proof.
     destruct port; cbn in *; try discriminate.
   Qed.
 
+  Lemma list_nil_app : forall A (l1 l2 : list A),
+    [] = l1 ++ l2 ->
+    [] = l1 /\ [] = l2.
+  Proof. now destruct l1. Qed.
+
   Lemma may_read1_latest_write_is_0 :
-    forall (l: Log) idx,
-      may_read l P1 idx = true ->
-      latest_write l idx = latest_write0 l idx.
+    forall (sl l: Log) idx,
+      may_read sl l P1 idx = true ->
+      latest_write sl idx = latest_write0 sl idx.
   Proof.
-    unfold may_read, latest_write, latest_write0, log_find, log_forallb.
-    intros * H.
-    rewrite log_forallb_not_existsb in H; unfold log_forallb in H.
-    set (getenv REnv l idx) as ls in *; cbn in *; clearbody ls.
-    set (R idx) as t in *; cbn in *.
-    revert H.
-    induction ls.
-    - reflexivity.
-    - intros * H; cbn in H.
-      repeat (bool_step || cleanup_step).
-      rewrite (IHls ltac:(eassumption)).
-      unfold log_latest_write_fn; cbn.
-      destruct a, kind, port; try discriminate; reflexivity.
+    unfold may_read; intros * H.
+    rewrite log_existsb_app, negb_true_iff, orb_false_iff in H.
+    destruct H.
+    now apply (latest_write_latest_write0 sl idx).
   Qed.
 
   Create HintDb oraat.
@@ -186,7 +185,7 @@ Section Proof.
         destruct latest_write0.
         * reflexivity.
         * erewrite getenv_commit_update by eassumption.
-          rewrite may_read1_latest_write_is_0 by eassumption.
+          erewrite may_read1_latest_write_is_0 by eassumption.
           reflexivity.
     - (* Write *) t.
     - (* UnOp *) t.
