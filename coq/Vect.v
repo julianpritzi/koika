@@ -167,6 +167,8 @@ Definition vect_nil {T} : vect T 0 := _vect_nil.
 
 Definition vect_cons {T n} (t: T) (v: vect T n) : vect T (S n) :=
   {| vhd := t; vtl := v |}.
+Definition vect_uncons {T n} (v: vect T (S n)) : vect T n :=
+  vect_tl v.
 
 Lemma vect_cons_hd_tl {T sz}:
   forall (v: vect T (S sz)),
@@ -390,11 +392,10 @@ Fixpoint vect_snoc {T sz} (t: T) (v: vect T sz) : vect T (S sz) :=
   | S sz => fun v => vect_cons (vect_hd v) (vect_snoc t (vect_tl v))
   end v.
 
-Fixpoint vect_unsnoc {T sz} (v: vect T (S sz)) : T * vect T sz :=
-  match sz return vect T (S sz) -> T * vect T sz with
-  | O => fun v => (vect_hd v, vect_tl v)
-  | S sz => fun v => let '(t, v') := vect_unsnoc (vect_tl v) in
-                 (t, vect_cons (vect_hd v) v')
+Fixpoint vect_unsnoc {T sz} (v: vect T (S sz)) : vect T sz :=
+  match sz return vect T (S sz) -> vect T sz with
+  | O => fun v => vect_tl v
+  | S sz => fun v => vect_cons (vect_hd v) (vect_unsnoc (vect_tl v))
   end v.
 
 (* reverse vector *)
@@ -414,8 +415,7 @@ Definition vect_cycle_l1 {T sz} (v: vect T sz) :=
 Definition vect_cycle_r1 {T sz} (v: vect T sz) :=
   match sz return vect T sz -> vect T sz with
   | O => fun v => v
-  | S sz => fun v => let '(t, v') := vect_unsnoc v in
-                 vect_cons t v'
+  | S sz => fun v => vect_cons (vect_last v) (vect_unsnoc v)
   end v.
 
 Fixpoint vect_dotimes {A} (f: A -> A) n (v: A)
@@ -982,7 +982,9 @@ Module Bits.
   Notation bits := (vect bool).
   Notation nil := (@vect_nil bool).
   Notation cons := (@vect_cons bool).
+  Notation uncons := (@vect_uncons bool).
   Notation snoc := (@vect_snoc bool).
+  Notation unsnoc := (@vect_unsnoc bool).
   Notation const := (@vect_const bool).
   Notation app := (fun x y => @vect_app bool _ _ y x). (* !! *)
   Notation repeat := (@vect_repeat bool).
@@ -1067,7 +1069,7 @@ Module Bits.
   Definition lsl1 {sz} (b: bits sz) :=
     match sz return bits sz -> bits sz with
     | 0 => fun b => b
-    | S _ => fun b => vect_cons false (snd (vect_unsnoc b))
+    | S _ => fun b => vect_cons false (vect_unsnoc b)
     end b.
 
   Definition asr {sz} nplaces (b: bits sz) :=
@@ -1105,17 +1107,21 @@ Module Bits.
     Definition to_index {sz} sz' (bs: bits sz) : option (index sz') :=
       index_of_nat sz' (to_nat bs).
 
-    Definition to_2cZ {sz} (bs: bits sz) : Z :=
-      if msb bs then
-        match to_N (neg bs) with
-        | N0 => -1
-        | Npos x => Zneg (Pos.succ x)
-        end
-      else
-        match to_N bs with
-        | N0 => 0
-        | Npos x => Zpos x
-        end%Z.
+    Definition to_2cZ {sz} : bits sz -> Z :=
+      match sz return bits sz -> Z with
+      | O => fun _ => 0
+      | S sz' => fun bs =>
+        if msb bs then
+          match to_N (neg bs) with
+          | N0 => -1
+          | Npos x => Zneg (Pos.succ x)
+          end
+        else
+          match to_N bs with
+          | N0 => 0
+          | Npos x => Zpos x
+          end
+      end%Z.
 
     Fixpoint of_positive (sz: nat) (p: positive) {struct sz} : bits sz :=
       match sz with
