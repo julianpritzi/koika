@@ -1,17 +1,18 @@
 (*! Calling external (verilog) modules from Kôika !*)
 Require Import Koika.Frontend.
-Require Koika.Std.
+Require Import Koika.TypedParsing.
+Require Koika.TypedStd.
 
 (* Koika.Std.Fifo1 is a polymorphic one-element fifo.
 
   The type of the fifo is indexed by the type of the data it holds, here we
   specialize the type of the fifo to fifo that holds [bits_t 5] values. *)
 
-Module FifoParams <: Std.Fifo.
+Module FifoParams <: TypedStd.Fifo.
   Definition T := bits_t 5.
 End FifoParams.
 
-Module Bits5Fifo := Std.Fifo1 FifoParams.
+Module Bits5Fifo := TypedStd.Fifo1 FifoParams.
 
 (* fromIO is the state of an instance of Bits5Fifo *)
 Inductive reg_t :=
@@ -39,26 +40,27 @@ Definition r idx : R idx :=
    generated for it when compiling to Verilog; instead, it will be removed and
    inputs and outputs will be generated to delegate its work to an external
    circuit *)
-Definition _outsideWorld :=
-  {{
+Definition _outsideWorld : action R empty_Sigma :=
+  <{
       let data := read0(ioPin) in
       fromIO.(Bits5Fifo.enq)(data)
-  }}.
+  }>.
 
-Definition _receive : uaction reg_t empty_ext_fn_t :=
-  {{
+Check _outsideWorld.
+
+Definition _receive : action R empty_Sigma :=
+  <{
       let dequeued := fromIO.(Bits5Fifo.deq)() in
       if (dequeued == Ob~0~0~0~1~0) then
         write0(Rdata, Ob~0~0~0~0~1)
       else
         fail
-  }}.
+  }>.
 
 Inductive rule_name_t :=
   outsideWorld | receive.
 
 Definition rules :=
-  tc_rules R empty_Sigma
            (fun rl => match rl with
                    | receive => _receive
                    | outsideWorld => _outsideWorld

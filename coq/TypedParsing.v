@@ -9,6 +9,7 @@ Require Import Unicode.Utf8.
 
 Import Specif.SigTNotations.
 
+Export Koika.TypedSyntaxMacros.
 Export Koika.Types.SigNotations.
 Export Koika.Primitives.PrimTyped.
 (* Export Koika.Primitives.PrimUntyped. *)
@@ -28,7 +29,7 @@ Definition fn_name_t := string.
 Definition action'
   {reg_t ext_fn_t}
   (R : reg_t -> type)
-  (Sigma: ext_fn_t -> ExternalSignature) 
+  (Sigma: ext_fn_t -> ExternalSignature)
   {sig tau} :=
     (TypedSyntax.action pos_t var_t fn_name_t R Sigma sig tau).
 
@@ -46,7 +47,21 @@ Definition function
   {sig tau} :=
     Types.InternalFunction' fn_name_t
       (TypedSyntax.action pos_t var_t fn_name_t R Sigma sig tau).
+(*
 
+TODO example
+
+reg1 : bits_t 4
+reg2 : btis_t 5
+
+
+0b"001100110" && (read(reg1) ++ read(reg2))
+
+bits_t 9 -> concat also has to be bits_t 9
+
+but has type ?a + ?b -> need bidirectionaly but not possible here
+
+*)
 (* When checking a concatenation we need to use the
  * bidirectionality hint before the arguments. Thats
  * because we need the unification to resolve R and Sigma
@@ -144,7 +159,7 @@ end) sig :=
  * Notation "a" := (Var (var_ref (ident_to_string a) _))
  *  (in custom koika_t at level 0, a constr at level 0, only parsing).
  * ```
- * 
+ *
  * This typeclass does the following: it gives us a function
  * `var_ref` which receives a `sig` and a name `k` and it returns
  * a member proof, that this name is part of the list, and there
@@ -224,7 +239,7 @@ Notation "'set' a ':=' b" := (Assign (var_ref a _) b) (in custom koika_t at leve
 
 Notation "'if' a 'then' t"            := (If a t                  (Const (tau := unit_t) Ob)) (in custom koika_t at level 89, t custom koika_t at level 89, right associativity, format "'[v' if  a '/' then  t ']'").
 Notation "'if' a 'then' t 'else' f"   := (If a t                  f                         ) (in custom koika_t at level 89, t custom koika_t at level 89, right associativity, format "'[v' if  a '/' then  t '/' else  f ']'").
-Notation "'guard' '(' a ')' "         := (If (Unop (Bits1 Not) a) (Fail (unit_t)) (Const Ob)) (in custom koika_t at level 89, right associativity, format "'guard' '(' a ')'").
+Notation "'guard' '(' a ')' "         := (If (Unop (Bits1 (Not _)) a) (Fail (unit_t)) (Const Ob)) (in custom koika_t at level 89, right associativity, format "'guard' '(' a ')'").
 
 (* Inspired by cpp the precedence  *)
 (* https://en.cppreference.com/w/cpp/language/operator_precedence *)
@@ -305,17 +320,17 @@ Notation "'#' s" := (Const (tau := bits_t _) s) (in custom koika_t at level 0, s
  *   All these notations need to be on the same level (here 0)
  *   else the parser would match on the highest level first and
  *   never even consider notations on a lower level.
- * 
+ *
  *   Likewise, all these notations need to start with a variable
  *   on the same level and in the same grammar (here a constr on level 0).
  *   Only so the parser can parse this variable first and then decide
  *   (depending on the following tokens) which notation matches.
- * 
+ *
  * Note:
  *   Some of the literal notations also start with an identifier.
  *   Thus, the same restrictions apply.
  *)
-(* Definition Var 
+(* Definition Var
   {reg_t ext_fn_t}
   {R : reg_t -> type}
   {Sigma : ext_fn_t -> ExternalSignature}
@@ -418,7 +433,7 @@ Notation "x '=>' a"      := [(x,a)]        (in custom koika_t_branches at level 
 Notation "arg1 '|' arg2" := (arg1 ++ arg2) (in custom koika_t_branches at level 1, format "'[v' arg1 ']' '/' '|'  '[v' arg2 ']'").
 
 (* TODO total match -> maybe for enums? *)
-(* For example if var has enum type then allow special match with 
+(* For example if var has enum type then allow special match with
 member names instead of `type::<mem>` and with optional default case
 
 Notation "enum_match" ? or a special case on "match v : enum_..."?
@@ -563,7 +578,7 @@ Section Macro.
   Context {R : reg_t -> type}.
   Context {Sigma: ext_fn_t -> ExternalSignature}.
 
-  (* A koika action which build a struct instance filled 
+  (* A koika action which build a struct instance filled
   with zeroes *)
   Definition struct_init_zeros {sig} (tau: type) : action' (sig := sig) R Sigma :=
     Unop (Conv tau Unpack) (Const (tau := bits_t _) (Bits.zeroes (type_sz tau))).
@@ -697,7 +712,7 @@ End BidirectionalityHintsTest.
  * definition, to see what types of arguments are expected. Implicit arguments
  * are converted to existential variables first and then coq goes on by checking
  * that each arguments actually has its expected type.
- * 
+ *
  * Note: As they are basically irrelevant for the example I am going to ignore
  *   pos_t, ..., ext_fn_t for breavity.
  *
@@ -712,7 +727,7 @@ End BidirectionalityHintsTest.
 
 (* Nothing needs to be inferred from the context  *)
 Arguments Fail         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} tau & : assert.
-Arguments Var {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} {k tau} m : assert.
+Arguments Var          {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} {k tau} m : assert.
 Arguments Const        {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} & cst : assert.
 Arguments Assign       {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & {k tau} m ex : assert.
 Arguments Seq          {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} & r1 r2 : assert.
@@ -722,7 +737,7 @@ Arguments Read         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} po
 Arguments Write        {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} port idx & value : assert.
 Arguments Unop         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} fn & arg1 : assert.
 Arguments Binop        {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} fn & arg1 arg2 : assert.
-Arguments ExternalCall {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & fn arg : assert.
+Arguments ExternalCall {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} fn & arg : assert.
 Arguments InternalCall {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} {argspec} & fn args : assert.
 Arguments APos         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} & pos a : assert.
 Arguments Build_InternalFunction' {fn_name_t action} & int_name int_body : assert.
@@ -762,7 +777,7 @@ Section Tests'.
   }>.
 
   Definition idk5 : @TypedSyntax.action unit string string _ _ R Sigma [("a", R' reg3)] (bits_t 4) := (@Var _ _ _ _ _ _ _ [("a", R' reg3)] "a" (_) (must_class (assoc "a" _)).2).
-  
+
   Arguments Var {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & {k tau} m : assert.
 
   Definition idk6 : @TypedSyntax.action unit string string _ _ R Sigma [("a", R' reg3)] (bits_t 4) := Var (k := "a") _.
@@ -964,7 +979,7 @@ Module Type Tests2.
   Definition idk : _action := <{
     (read0(data0))[Ob~1~1~1 :+ 3]
   }>.
-  
+
   Definition idk2 : _action := <{
     let idk := Ob~1~1~1~0~0 in
     ignore(if (!idk)[#(Bits.of_nat 3 0) :+ 1] then (
@@ -1007,7 +1022,7 @@ Module Type Tests2.
                                bar := |32`d98| } in
       unpack(struct_t mem_req, pack(a))
   }>.
-  
+
   (* Accessing enum constants *)
   Definition some_s := {|
     struct_name:= "some_s";

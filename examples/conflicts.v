@@ -1,5 +1,6 @@
 (*! Understanding conflicts and forwarding !*)
 Require Import Koika.Frontend.
+Require Import Koika.TypedParsing.
 
 Inductive reg_t :=
 | in0_empty | in0_data
@@ -15,27 +16,27 @@ Definition R (reg: reg_t) : type :=
   | in0_data | in1_data | fifo_data | out_data => bits_t 32
   end.
 
-Definition urules (rl: rule_name_t) : uaction reg_t empty_ext_fn_t :=
+Definition rules (rl: rule_name_t) : action R empty_Sigma :=
   match rl with
   | deq0 =>
-    {{ guard(!read0(in0_empty) && read0(fifo_empty));
+    <{ guard(!read0(in0_empty) && read0(fifo_empty));
        write0(fifo_data, read0(in0_data));
        write0(fifo_empty, Ob~0);
-       write0(in0_empty, Ob~1) }}
+       write0(in0_empty, Ob~1) }>
   | deq1 =>
-    {{ guard(!read0(in1_empty) && read0(fifo_empty));
+    <{ guard(!read0(in1_empty) && read0(fifo_empty));
        write0(fifo_data, read0(in1_data));
        write0(fifo_empty, Ob~0);
-       write0(in1_empty, Ob~1) }}
+       write0(in1_empty, Ob~1) }>
   | process =>
-    {{ guard(!read1(fifo_empty) && read0(out_empty));
+    <{ guard(!read1(fifo_empty) && read0(out_empty));
        write0(out_data, read1(fifo_data) + |32`d412|);
        write1(fifo_empty, Ob~1);
-       write0(out_empty, Ob~0) }}
+       write0(out_empty, Ob~0) }>
   end.
 
-Definition rules : rule_name_t -> rule R empty_Sigma :=
-  tc_rules R empty_Sigma urules.
+(* Definition rules : rule_name_t -> rule R empty_Sigma :=
+  tc_rules R empty_Sigma urules. *)
 
 Definition pipeline : scheduler :=
   deq0 |> deq1 |> process |> done.

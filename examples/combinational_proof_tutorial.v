@@ -1,5 +1,6 @@
 (*! Tutorial: Verifying a small combinational circuit !*)
 Require Import Koika.Frontend.
+Require Import Koika.TypedParsing.
 
 (*|
 ============================================================
@@ -74,14 +75,14 @@ For example here we replace the multiply-by-4 operation with bitvector operation
 Since we are writing a combinational function, the design is parametric on the set of registers `reg_t`:
 |*)
 
-  Definition design reg_t : UInternalFunction reg_t empty_ext_fn_t := {{
+  Definition design reg_t (R : reg_t -> type) : function R empty_Sigma := <{
     fun design (op: bits_t 8) (input: bits_t sz): bits_t sz =>
       match unpack(enum_t ops, op) with
-      | enum ops { quadruple } => input[|4`d0|:+14] ++ Ob~0~0
-      | enum ops { rotate_half } => input[|4`d0|:+8] ++ input[|4`d8|:+8]
+      | enum ops::< quadruple > => input[0d"0":+14] ++ Ob~0~0
+      | enum ops::< rotate_half > => input[0d"0":+8] ++ input[0d"8":+8]
       return default: |16`d0|
       end
-  }}.
+  }>.
 
 (*|
 The program above is *untyped*; we want to typecheck it; again, since we do not look at registers, we leave `reg_t` and `R` as parameters:

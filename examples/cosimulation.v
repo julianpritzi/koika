@@ -1,5 +1,6 @@
 (*! Using black-box Verilog models (combining Cuttlesim and Verilator) !*)
 Require Import Koika.Frontend.
+Require Import Koika.TypedParsing.
 
 Module CoSimulation.
   Inductive reg_t := counter | blackbox_response.
@@ -23,17 +24,16 @@ Module CoSimulation.
     | blackbox => {$ bits_t 32 ~> bits_t 32 $}
     end.
 
-  Definition _increment_counter : uaction reg_t ext_fn_t :=
-    {{ write0(counter, read0(counter) + |32`d1|) }}.
+  Definition _increment_counter : action R Sigma :=
+    <{ write0(counter, read0(counter) + |32`d1|) }>.
 
-  Definition _call_blackbox : uaction reg_t ext_fn_t :=
-    {{ write0(blackbox_response, extcall blackbox(read0(counter))) }}.
+  Definition _call_blackbox : action R Sigma :=
+    <{ write0(blackbox_response, extcall blackbox(read0(counter))) }>.
 
   Definition cosimulation : scheduler :=
     call_blackbox |> increment_counter |> done.
 
   Definition rules :=
-    tc_rules R Sigma
              (fun r => match r with
                     | increment_counter => _increment_counter
                     | call_blackbox => _call_blackbox
