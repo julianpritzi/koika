@@ -1,5 +1,6 @@
 (*! Sanity check for mux-elimination optimization !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Inductive nested_cnt :=
   NC0 | NC1 | NC2 | NC3 | NC4 | NC5 | NC6.

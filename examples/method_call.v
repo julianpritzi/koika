@@ -1,5 +1,6 @@
 (*! Calling methods of internal modules !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 Require Import Koika.Std.
 
 

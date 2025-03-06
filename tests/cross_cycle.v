@@ -1,6 +1,7 @@
 (*! Cross-cycle optimization in Cuttlesim models !*)
 (* The way Cuttlesim is designed enables GCC to completely reduce this calculation *)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Inductive reg_t := a.
 Inductive rule_name_t := rl.

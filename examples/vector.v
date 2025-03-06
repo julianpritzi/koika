@@ -1,5 +1,6 @@
 (*! Representing vectors of registers using Coq inductives !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Definition nregs := 16.
 Definition reg_sz := 32.

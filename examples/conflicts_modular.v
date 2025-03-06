@@ -1,4 +1,5 @@
 (*! Understanding conflicts and forwarding, with modules !*)
+Require Import Koika.Parsing.
 Require Import Koika.Frontend.
 
 Module Import Queue32.

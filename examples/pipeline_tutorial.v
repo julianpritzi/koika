@@ -1,4 +1,5 @@
 (*! Tutorial: Simple arithmetic pipeline !*)
+Require Import Koika.Parsing.
 Require Import Koika.Frontend.
 
 (*|

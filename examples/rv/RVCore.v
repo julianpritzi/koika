@@ -1,4 +1,5 @@
 (*! Implementation of our RISC-V core !*)
+Require Import Koika.Parsing.
 Require Import Koika.Frontend.
 Require Import Coq.Lists.List.
 

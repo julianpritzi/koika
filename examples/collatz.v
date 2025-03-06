@@ -167,7 +167,7 @@ Module Collatz_Test.
     (fun ctxt out =>
       let r0 := Bits.to_nat ctxt.[r0] in
       let out  := Bits.to_nat out in
-      
+
       (*
        * We expect that the output is 3 times or input
        * and that the register value or r0 did not change
@@ -187,7 +187,7 @@ Module Collatz_Test.
     (fun ctxt =>
       let bits_r0 := ctxt.[r0]           in
       let nat_r0  := Bits.to_nat bits_r0 in
-      
+
       nat_r0 = (18/2)*3+1
     ).
   Proof.

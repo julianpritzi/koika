@@ -1,5 +1,6 @@
 (*! Structure unpacking !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Inductive reg_t := Rpacked | Runpacked_manual | Runpacked_unpack.
 Definition ext_fn_t := empty_ext_fn_t.

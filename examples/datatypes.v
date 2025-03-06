@@ -1,5 +1,6 @@
 (*! Using structures, enums, and arrays !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Inductive reg_t := input | output.
 Inductive rule_name_t := decr_icmp_ttl | clear_checksum.

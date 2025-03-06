@@ -2,6 +2,7 @@
 Require Import Coq.Lists.List.
 
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 Require Import Koika.Std.
 
 Module Type Scoreboard_sig.

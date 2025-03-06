@@ -1,5 +1,6 @@
 (*! Intfun tests !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Inductive reg_t := reg0.
 Inductive rule_name_t := rl0.

@@ -1,5 +1,6 @@
 (*! Definition of a pipelined schedule !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 Require Import rv.RVCore.
 
 Definition rv_schedule : scheduler :=

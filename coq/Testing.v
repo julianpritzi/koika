@@ -1,3 +1,4 @@
+Require Import Koika.Parsing.
 Require Import Koika.Frontend.
 Require Import Coq.Program.Equality.
 

@@ -1,5 +1,6 @@
 (*! Double-write detection and prevention !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Inductive reg_t := reg0.
 Inductive rule_name_t := wr0 | skip | wr0_fail.

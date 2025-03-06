@@ -1,5 +1,6 @@
 (*! Make sure that the large writeset heuristics in the scheduler don't break things !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Definition N := 10.
 Inductive reg_t := data (idx: Vect.index N).

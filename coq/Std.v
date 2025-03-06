@@ -1,5 +1,6 @@
 (*! Stdlib | Standard library !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Section Maybe.
   Context (tau: type).

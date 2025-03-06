@@ -1,5 +1,6 @@
 (*! External functions !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Inductive reg_t := reg0.
 Inductive ext_fn_t := f0.

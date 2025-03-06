@@ -1,4 +1,5 @@
 (*! Tutorial: Verifying a small combinational circuit !*)
+Require Import Koika.Parsing.
 Require Import Koika.Frontend.
 Require Import Koika.TypedParsing.
 

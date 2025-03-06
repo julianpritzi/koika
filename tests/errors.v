@@ -1,4 +1,5 @@
 (*! Syntax and typing errors in Coq !*)
+Require Import Koika.Parsing.
 Require Import Koika.Frontend.
 
 Inductive reg_t := R0.

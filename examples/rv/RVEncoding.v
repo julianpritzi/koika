@@ -1,5 +1,6 @@
 (*! Encoding-related constants !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Definition opcode_LOAD      := Ob~0~0~0~0~0~1~1.
 Definition opcode_LOAD_FP   := Ob~0~0~0~0~1~1~1.

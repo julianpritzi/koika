@@ -1,5 +1,6 @@
 (*! Ensure that area is reasonable when bypasses don't need extra tracking !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 Require Import Koika.Std.
 
 Definition data_sz := 13.

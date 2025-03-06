@@ -1,5 +1,6 @@
 (*! Computing an FFT !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Section KArray.
   Definition array_init T n {reg_t ext_fn_t} : UInternalFunction reg_t ext_fn_t :=

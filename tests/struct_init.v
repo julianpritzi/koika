@@ -1,5 +1,6 @@
 (*! Structure initialization !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Inductive reg_t := input (_: Vect.index 8) | output.
 Definition ext_fn_t := empty_ext_fn_t.

@@ -1,5 +1,6 @@
 (*! Building simple pipelines !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Inductive reg_t := r0 | outputReg | inputReg | invalid | correct.
 Inductive ext_fn_t := Stream | F | G.

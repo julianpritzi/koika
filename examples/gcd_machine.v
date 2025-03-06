@@ -1,5 +1,6 @@
 (*! Computing GCDs !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 Require Import Koika.Std.
 
 Module GCDMachine.

@@ -1,5 +1,6 @@
 (*! Regression test for signed shifts !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Inductive idx := r3 | r4 | r5 | r6 | r7 | r8 | r9 | r10 | r11 | r12 | r13 | r14 | r15 | r16.
 Inductive reg_t := cond | r_l (_: idx) | r_r (_: idx) | r_out (_: idx).

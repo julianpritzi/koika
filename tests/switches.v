@@ -1,5 +1,6 @@
 (*! Test various forms of switches !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Definition clocksz := 2.
 Definition idxsz := 5.

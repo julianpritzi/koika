@@ -1,5 +1,6 @@
 (*! Calling external functions !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Inductive reg_t := pc | next_instr_int | next_instr_ext.
 Inductive ext_fn_t := nth_instr_external.

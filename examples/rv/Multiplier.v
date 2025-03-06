@@ -1,6 +1,7 @@
 (*! Implementation of a multiplier module !*)
 
 Require Import Koika.Frontend Koika.Std.
+Require Import Koika.Parsing.
 
 Module Type Multiplier_sig.
   (* bit length of inputs *)

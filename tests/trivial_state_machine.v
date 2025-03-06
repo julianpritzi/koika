@@ -1,5 +1,6 @@
 (*! Trivial state machine !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Definition SZ := 32.
 Inductive reg_t := st | internal.

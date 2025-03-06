@@ -1,5 +1,6 @@
 (*! Detect and reject programs that call read1 after write1 in simulation !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Inductive reg_t :=
 | yes_plain | yes_if | yes_function | yes_spurious

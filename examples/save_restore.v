@@ -1,5 +1,6 @@
 (*! Save and restore simulation state !*)
 Require Import Koika.Frontend.
+Require Import Koika.Parsing.
 
 Module SaveRestore.
   Inductive reg_t := counter.
