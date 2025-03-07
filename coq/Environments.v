@@ -520,6 +520,22 @@ Definition ContextEnv {K} {FT: FiniteType K}: Env K.
   - intros; apply cassoc_creplace_neq_k; eassumption.
 Defined.
 
-Notation "env .[ idx ]" := (ContextEnv.(getenv) env idx) (at level 1, format "env .[ idx ]").
-Notation "env '.N[' idx ']'" := (Bits.to_N (ContextEnv.(getenv) env idx)) (at level 1, format "env .N[ idx ]").
-Notation "env '.nat[' idx ']'" := (Bits.to_nat (ContextEnv.(getenv) env idx)) (at level 1, format "env .nat[ idx ]").
+(* The level here should be somewhere below 10 to bind stronger than
+  normal function application - I prefer to avoid level 0 as this notation
+  is not closed + it needs left associativity *)
+Notation "env '![' X '|->' a ']'" := (putenv _ env X a) (at level 1, left associativity, format "env ![ X  |->  a ]").
+(* TODO: maybe update to a special syntax for more concise multi-updates *)
+
+Notation "env '?[' idx ']'"    :=               (getenv _ env idx)  (at level 1, format "env ?[ idx ]").
+Notation "env '?[' idx ']>N'"   := (Bits.to_N   (getenv _ env idx)) (at level 1, format "env ?[ idx ]>N").
+Notation "env '?[' idx ']>nat'" := (Bits.to_nat (getenv _ env idx)) (at level 1, format "env ?[ idx ]>nat").
+
+Module TestNotations.
+  Inductive T := A | B.
+  Definition init (t : T) : nat :=
+      match t with | A => 1 | B => 2 end.
+  Definition t := ContextEnv.(create) init.
+
+  Definition new_t : env_t _ _ := t![A |-> 2]![B |-> 1].
+  Definition assert : new_t?[A] = t?[B] := eq_refl.
+End TestNotations.
