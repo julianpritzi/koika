@@ -309,8 +309,7 @@ Record InternalFunction' {fn_name_t action: Type} :=
   { int_name : fn_name_t;
     int_body : action }.
 Arguments InternalFunction' : clear implicits.
-Arguments Build_InternalFunction' {fn_name_t action}
-          int_name int_body : assert.
+Arguments Build_InternalFunction' {fn_name_t action} & int_name int_body : assert.
 
 (** * Debugging and disambiguation of type names **)
 

@@ -3,7 +3,7 @@ Require Import Koika.Frontend.
 Require Import Koika.Parsing.
 
 Definition N := 10.
-Inductive reg_t := data (idx: Vect.index N).
+Inductive reg_t := idk | data (idx: Vect.index N).
 Inductive rule_name_t := wr_butlast | wr_last.
 
 Definition reg_of_nat n :=

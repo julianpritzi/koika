@@ -1,6 +1,6 @@
 (*! Using structures, enums, and arrays !*)
 Require Import Koika.Frontend.
-Require Import Koika.Parsing.
+Require Import Koika.TypedParsing.
 
 Inductive reg_t := input | output.
 Inductive rule_name_t := decr_icmp_ttl | clear_checksum.
@@ -66,30 +66,32 @@ Definition r reg : R reg :=
     Bits.zero
   end.
 
-Definition _decr_icmp_ttl : uaction _ empty_ext_fn_t :=
-  {{
-      let hdr := unpack(struct_t ipv4_header, read0(input)) in
-      let valid := Ob~1 in
-      match get(hdr, protocol) with
-      | enum proto { ICMP } =>
-        let t := get(hdr, ttl) in
-        if t == |8`d0| then
-          set valid := Ob~0
-        else
-          set hdr := subst(hdr, ttl, t - |8`d1|) (* ← same as [put(hdr, ttl, t - 1)] *)
-      return default: pass
-      end;
-      set hdr := subst(hdr, reserved, enum flag { unset }); (* reset the [reserved] field, just in case *)
-      write0(output, pack(struct response { valid := valid; value := hdr }))
-  }}.
+(* Set Typeclasses Debug. *)
+
+Definition _decr_icmp_ttl : action R empty_Sigma := <{
+  let hdr := unpack(struct_t ipv4_header, read0(input)) in
+  let valid := Ob~1 in
+  match hdr.[protocol] with
+  | enum proto::< ICMP > => pass
+    (* let t := hdr.[ttl] in
+    if t == |8`d0| then
+      set valid := Ob~0
+    else
+      set hdr := subst(hdr, ttl, t - |8`d1|) *)
+      (* ← same as [put(hdr, ttl, t - 1)] *)
+  return default: pass
+  end;
+  (* set hdr := subst(hdr, reserved, enum flag::< unset >); (* reset the [reserved] field, just in case *)
+  write0(output, pack(struct response::{ valid := valid; value := hdr })) *)
+}>.
 
 Definition _clear_checksum : uaction reg_t empty_ext_fn_t :=
-  {{
+  <{
       let presp := read1(output) in
       let phdr := getbits(response, presp, value) in
       set phdr := substbits(ipv4_header, phdr, checksum, |16`d0|);
       write1(output, substbits(response, presp, value, phdr))
-  }}.
+  }>.
 
 Definition rules :=
   tc_rules R empty_Sigma

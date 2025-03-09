@@ -1,6 +1,6 @@
 (*! Building simple pipelines !*)
 Require Import Koika.Frontend.
-Require Import Koika.Parsing.
+Require Import Koika.TypedParsing.
 
 Inductive reg_t := r0 | outputReg | inputReg | invalid | correct.
 Inductive ext_fn_t := Stream | F | G.
@@ -32,36 +32,33 @@ Definition Sigma (fn: ext_fn_t) : ExternalSignature :=
   | G => {$ bits_t sz ~> bits_t sz $}
   end.
 
-Definition _doF : uaction _ _ :=
-  {{
-     let v := read0(inputReg) in
-     write0(inputReg, extcall Stream(v));
-     let invalid := read1(invalid) in
-     if invalid then
-       write1(invalid, Ob~0);
-       write0(r0,extcall F(v))
-     else
-       fail
-  }}.
+Definition _doF : action R Sigma := <{
+  let v := read0(inputReg) in
+  write0(inputReg, extcall Stream(v));
+  let invalid := read1(invalid) in
+  if invalid then (
+    write1(invalid, Ob~0);
+    write0(r0,extcall F(v))
+  ) else fail
+}>.
 
-Definition _doG : uaction _ _ :=
-  {{
-      let invalid := read0(invalid) in
-      if !invalid then
-        let data := read0(r0) in
-        let v := read0(outputReg) in
-        write0(outputReg, extcall Stream(v));
-        write0(invalid, Ob~1);
-        if extcall G(data) == extcall G(extcall F(v)) then
-          pass
-        else
-          write0(correct, Ob~0)
-      else
-        fail
-  }}.
+Definition _doG : action R Sigma := <{
+  let invalid := read0(invalid) in
+  if !invalid then
+    let data := read0(r0) in
+    let v := read0(outputReg) in
+    write0(outputReg, extcall Stream(v));
+    write0(invalid, Ob~1);
+    if extcall G(data) == extcall G(extcall F(v)) then
+      pass
+    else
+      write0(correct, Ob~0)
+  else
+    fail
+}>.
 
 Definition rules :=
-  tc_rules R Sigma
+  (* tc_rules R Sigma *)
            (fun rl => match rl with
                    | doF => _doF
                    | doG => _doG

@@ -10,6 +10,7 @@ Import EqNotations.
 Inductive index' {A} := thisone | anotherone (a: A).
 Arguments index': clear implicits.
 
+(* TODO is this the same as Fin.t *)
 Fixpoint index n : Type :=
   match n with
   | 0 => False

@@ -976,6 +976,13 @@ Section HoareFacts.
       ∀ (P : tcontext [] → REnv.(env_t) R → @tcontext var_t sig → Prop),
       hoare_triple_args CtxEmpty (fun env Γ => P CtxEmpty env Γ) P (sigma := sigma).
     Proof. intros *; unfold hoare_triple_args. solve_hoare. Qed.
+
+    Theorem hoare_args_weaken_pre {sig} {argspec : tsig var_t} (args : acontext sig argspec) :
+    ∀ P P' Q,
+    hoare_triple_args args P' Q (sigma := sigma) (REnv := REnv)->
+    (∀ env Γ,  P env Γ -> P' env Γ) ->
+    hoare_triple_args args P Q (sigma := sigma) (REnv := REnv).
+    Proof. unfold hoare_triple_args in *. intros. exact (H0 _ _ _ _ _ (H1 _ _ H2) H3). Qed.
   End sigma.
 
   Theorem hoare_ext_call {sig} sigma fn a :
@@ -1060,6 +1067,12 @@ Ltac hoare_cleanup :=
   | H: context[VarCtxMemberHd]   |- _ => unfold VarCtxMemberHd in H
   | |- context[VarCtxMemberTl]        => unfold VarCtxMemberTl
   | H: context[VarCtxMemberTl]   |- _ => unfold VarCtxMemberTl in H
+  | |- context[Hoare.var_ctx_member]        => unfold Hoare.var_ctx_member
+  | H: context[Hoare.var_ctx_member]   |- _ => unfold Hoare.var_ctx_member in H
+  | |- context[Hoare.VarCtxMemberHd]        => unfold Hoare.VarCtxMemberHd
+  | H: context[Hoare.VarCtxMemberHd]   |- _ => unfold Hoare.VarCtxMemberHd in H
+  | |- context[Hoare.VarCtxMemberTl]        => unfold Hoare.VarCtxMemberTl
+  | H: context[Hoare.VarCtxMemberTl]   |- _ => unfold Hoare.VarCtxMemberTl in H
   | |- context[cassoc (MemberHd _ _) (CtxCons _ _ _)]          => progress change (cassoc (MemberHd _ _) (CtxCons _ ?a _)) with a
   | H: context[cassoc (MemberHd _ _) (CtxCons _ _ _)]     |- _ => progress change (cassoc (MemberHd _ _) (CtxCons _ ?a _)) with a in H
   | |- context[cassoc (MemberTl _ _ _ _) (CtxCons _ _ _)]      => progress change (cassoc (MemberTl _ _ _ ?m) (CtxCons _ _ ?ctx)) with (cassoc m ctx)
@@ -1103,7 +1116,7 @@ Tactic Notation "hoare" :=
 
 Notation "'{' P '}' a '{' Q '}'" := (hoare_triple a P Q) (at level 200, P custom assertion, Q custom ret_assertion, only printing).
 
-Notation "G '?[' f ']'" := (@cassoc _ _ _ (f,_) _ G) (only printing).
+Notation "G '?[' f ']'" := (@cassoc _ _ _ (f,_) _ G) (at level 1, only printing).
 Notation "'bits(' n ')'" := (Bits.of_nat _ n) (format "bits( n )", only printing).
 
 
@@ -1151,6 +1164,27 @@ Module HoareTest.
   fun add (a: bits_t sz) (b: bits_t sz) : bits_t sz =>
     a + double(b)
   }>.
+
+  Definition times_three (sz : nat) : function R empty_Sigma :=
+    <{ fun times_three (b: bits_t sz) : bits_t sz =>
+         (b << Ob~1) + b }>.
+
+  Notation "'{{' P '}}' a '{{' Q '}}'" := (forall REnv, @hoare_triple _ _ _ R empty_Sigma REnv _ _ empty_sigma a P Q) (at level 10, P custom assertion, Q custom ret_assertion, only parsing).
+
+  Theorem times_three_correct :
+    ∀ sz n : nat,
+    {{ Γ[b] = n }} times_three sz {{ r, r = $(3*n) }}.
+  Proof.
+    hoare.
+    cbv zeta.
+    unfold BitFuns.lsl.
+    vm_compute (Bits.to_nat _).
+    setoid_rewrite H.
+    rewrite <- Nat2Bits.inj_lsl_pow2.
+    rewrite <- Nat2Bits.inj_add.
+    f_equal.
+    cbn. lia.
+  Qed.
 
   (* Theorem add_8_self :
     ∀ n REnv (env : REnv.(env_t) R) action_log scheduler_log ,
@@ -1217,7 +1251,6 @@ Module HoareTest.
     now rewrite Nat.add_0_r, Nat2Bits.inj_add.
   Qed. *)
 
-  Notation "'{{' P '}}' a '{{' Q '}}'" := (forall REnv, @hoare_triple _ _ _ R empty_Sigma REnv _ _ empty_sigma a P Q) (at level 10, P custom assertion, Q custom ret_assertion, only parsing).
 
   Theorem double_correct :
     ∀ sz n : nat,
@@ -1267,9 +1300,9 @@ Module HoareTest.
     hoare.
     hoare.
     eexists; apply conj.
-    match goal with
+    (* match goal with
     | |- hoare_triple (rew [λ t : ?A, ?P] ?e in ?k) _ _ => unfold e, eq_rect
-    end.
+    end. *)
     hoare.
     hnf.
     change (bin_string_to_N ?s) with ltac:(let e := eval cbn in (bin_string_to_N s) in exact (e)).
@@ -1426,12 +1459,12 @@ Admitted. *)
     | S n => fun bodies =>
       (* FIXME add a version of sel taking a compile-time constant? *)
       If (Binop (Bits2 (Sel _)) (Var m) (Const bit_idx))
-         (muxtree (S bit_idx) k (fun bs => bodies bs~1))
-         (muxtree (S bit_idx) k (fun bs => bodies bs~0))
+         (muxtree (S bit_idx) k (fun bs => bodies bs~1) (m := m))
+         (muxtree (S bit_idx) k (fun bs => bodies bs~0) (m := m))
     end bodies.
 
   Definition CompleteMuxTree {sig tau} {sz} (k: var_t) {m : member (k, bits_t sz) sig} (branches: bits sz -> action sig tau) :=
-    muxtree 0 k branches.
+    muxtree 0 k branches (m := m).
 
   Lemma mux_tree_size_bounded :
     ∀ ext_meas sig tau sz k m b,

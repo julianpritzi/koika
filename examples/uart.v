@@ -1,7 +1,28 @@
 (*! UART transmitter !*)
 Require Import Koika.Frontend.
-Require Import Koika.Parsing.
-Require Import Koika.Std.
+Require Import Koika.TypedParsing.
+(* Require Import Koika.Std. *)
+
+
+Section Maybe.
+  Context {tau: type}.
+  Context {reg_t ext_fn_t} {R : reg_t -> type} {Sigma : ext_fn_t -> ExternalSignature}.
+
+  Definition Maybe :=
+    {| struct_name := "maybe_" ++ type_id tau;
+       struct_fields := [("valid", bits_t 1); ("data", tau)] |}.
+
+  Definition valid : function R Sigma :=
+    <{ fun valid (x: tau) : struct_t Maybe =>
+         struct Maybe::{ valid := Ob~1; data := x } }>.
+
+  Definition invalid : function R Sigma :=
+    <{ fun invalid () : struct_t Maybe =>
+         struct Maybe::{ valid := Ob~0 } }>.
+End Maybe.
+
+Notation maybe tau := (struct_t (@Maybe tau)).
+
 
 Module UART.
   Definition CLOCK_SPEED := 25_000_000%N.
@@ -52,14 +73,17 @@ Module UART.
     | ext_write_bit => {$ bits_t 1 ~> bits_t 1 $}
     end.
 
-  Definition _read_input : uaction reg_t ext_fn_t :=
-    {{
-        let ready := read1(state) == enum tx_state { idle } in
+    Definition _read_input : action R Sigma := <{
+      let opt := struct Maybe::{ valid := Ob~0 } in
+      if Ob~1 && opt.[valid] then pass
+  }>.
+  Definition _read_input : action R Sigma := <{
+        let ready := read1(state) == enum tx_state::<idle> in
         let opt_byte := extcall ext_read_byte(ready) in
-        (when ready && get(opt_byte, valid) do
+        (when ready && opt_byte.[valid] do
            write1(in_byte, get(opt_byte, data));
-           write1(state, enum tx_state { start }))
-    }}.
+           write1(state, enum tx_state::<start>))
+    }>.
 
   Definition _transmit : uaction reg_t ext_fn_t :=
     {{

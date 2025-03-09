@@ -2,9 +2,11 @@
 Require Import Koika.Frontend.
 Require Import Koika.Parsing.
 Require Import Koika.Std.
+Require Import Koika.TypedParsing.
 
 Module GCDMachine.
   Definition ext_fn_t := empty_ext_fn_t.
+  Definition Sigma := empty_Sigma.
 
   Inductive reg_t :=
   | input_data
@@ -38,8 +40,8 @@ Module GCDMachine.
     | output_data => Bits.zero
     end.
 
-  Definition gcd_start : uaction reg_t ext_fn_t :=
-    {{
+  Definition gcd_start : action R Sigma :=
+    <{
         if read0(input_valid) == Ob~1 && !read0(gcd_busy) then
           let data := read0(input_data) in
           write0(gcd_a, get(data, a));
@@ -48,7 +50,7 @@ Module GCDMachine.
           write0(input_valid, Ob~0)
         else
           fail
-    }}.
+    }>.
 
   Definition gcd_compute : uaction reg_t ext_fn_t :=
     {{

@@ -1,6 +1,7 @@
 (*! Stdlib | Standard library !*)
 Require Import Koika.Frontend.
 Require Import Koika.TypedParsing.
+Require Import Koika.Hoare.
 
 Section Maybe.
   Context (tau: type).
@@ -18,6 +19,10 @@ Section Maybe.
     <{ fun invalid () : struct_t Maybe =>
          struct Maybe::{ valid := Ob~0 } }>.
 End Maybe.
+(* tau can be implicit as it should be inferred from the argument / return type *)
+Arguments valid {tau} {reg_t ext_fn_t} {R Sigma} : assert.
+Arguments invalid {tau} {reg_t ext_fn_t} {R Sigma} : assert.
+
 
 Notation maybe tau := (struct_t (Maybe tau)).
 
@@ -61,8 +66,8 @@ Module Fifo1 (f: Fifo).
 
   Definition peek : function R empty_Sigma :=
     <{ fun peek () : maybe T =>
-         if can_deq () then {valid T}(read0(data0))
-         else {invalid T}() }>.
+         if can_deq () then valid(read0(data0))
+         else invalid() }>.
 
   Definition deq : function R empty_Sigma :=
     <{ fun deq () : T =>
@@ -71,6 +76,20 @@ Module Fifo1 (f: Fifo).
         read0(data0) }>.
 
   #[global] Instance FiniteType_reg_t : FiniteType reg_t := _.
+
+  (* Notation "'{{' P '}}' a '{{' Q '}}'" := (forall REnv, @hoare_triple _ _ _ R empty_Sigma REnv _ _ empty_sigma a P Q) (at level 10, P custom assertion, Q custom ret_assertion, only parsing).
+  From Coq Require Import Utf8.
+
+  Theorem double_correct :
+    ∀ sz n : nat,
+    {{ (getenv _ env valid0) = n }} @enq {{ r, r = $(2*n) }}.
+  Proof.
+    hoare.
+    unfold BitFuns.lsl.
+    vm_compute (Bits.to_nat _).
+    now rewrite H, <- Nat2Bits.inj_lsl_pow2, Nat.pow_1_r, Nat.mul_comm.
+  Qed. *)
+
 
 
 End Fifo1.
@@ -111,8 +130,8 @@ Module Fifo1Bypass (f: Fifo).
 
   Definition peek : function R empty_Sigma :=
     <{ fun peek () : maybe T =>
-         if can_deq () then {valid T}(read1(data0))
-         else {invalid T}() }>.
+         if can_deq () then valid(read1(data0))
+         else invalid() }>.
 
   Definition deq :  function R empty_Sigma :=
     <{ fun deq () : T =>

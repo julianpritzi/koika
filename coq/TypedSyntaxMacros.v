@@ -7,6 +7,7 @@ Require Import Ascii.
 
 Require Import Magic.
 
+(* Require Import Koika.Hoare. *)
 Section TypedSyntaxMacros.
   Context {pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t: Type}.
 
@@ -15,6 +16,52 @@ Section TypedSyntaxMacros.
 
   Notation action := (action pos_t var_t fn_name_t).
   Notation InternalFunction R Sigma sig tau := (InternalFunction pos_t var_t fn_name_t R Sigma sig tau).
+
+  (* Section Switching.
+    Notation action := (action R Sigma).
+
+    Fixpoint muxtree {sig tau} {sz} (bit_idx : nat) (k: var_t) {m : member (k, bits_t sz) sig} {bsz} (bodies: bits bsz -> action sig tau) :=
+      match bsz return (bits bsz -> action sig tau) -> action sig tau with
+      | 0 => fun bodies => bodies Ob
+      | S n => fun bodies =>
+        (* FIXME add a version of sel taking a compile-time constant? *)
+        If (Binop (Bits2 (Sel _)) (Var m) (Const (value_of_bits (Bits.of_nat _ bit_idx))))
+          (muxtree (S bit_idx) k (fun bs => bodies bs~1))
+          (muxtree (S bit_idx) k (fun bs => bodies bs~0))
+      end bodies.
+
+    Definition CompleteMuxTree {sig tau} {sz} (k: var_t) {m : member (k, bits_t sz) sig} (branches: bits sz -> action sig tau) :=
+      muxtree 0 k branches.
+
+
+    Inductive switch_style :=
+      | TreeSwitch.
+      (* | OrTreeSwitch (nbits: nat)
+      | NestedSwitch
+      | SequentialSwitchTt
+      | SequentialSwitch (tau: type) (output_var: var_t). *)
+
+    Definition CompleteSwitch {sig tau} (style: switch_style)
+      {sz} (k: var_t) {m : member (k, bits_t sz) sig}
+      (branch_bodies: index (pow2 sz) -> action sig tau) :=
+      (* let branches bodies := gen_branches sz (pow2 sz) bodies in *)
+      match style with
+      | TreeSwitch =>
+        CompleteMuxTree k (fun bs => branch_bodies (Bits.to_index_safe bs))
+      (* | OrTreeSwitch nbits =>
+        UCompleteOrTree sz nbits var (fun bs => branch_bodies (Bits.to_index_safe bs))
+      | NestedSwitch =>
+        uswitch_nodefault (UVar var) (branches branch_bodies)
+      | SequentialSwitchTt =>
+        uswitch_stateful (UVar var) (branches branch_bodies)
+      | SequentialSwitch output_type output_var =>
+        let branch_bodies idx := UAssign output_var (branch_bodies idx) in
+        UBind output_var
+              (uinit output_type)
+              (USeq (uswitch_stateful (UVar var) (branches branch_bodies))
+                    (UVar output_var)) *)
+      end.
+    End Switching. *)
 
   (* filter a single char out of a string *)
   Local Fixpoint filters' (s : string) (a : ascii) : string :=
@@ -122,7 +169,7 @@ Section TypedSyntaxMacros.
     Fixpoint lift
              {sig tau}
              (a: action R' Sigma' sig tau)
-      : action R Sigma sig tau := 
+      : action R Sigma sig tau :=
       match a with
       | Fail tau => Fail tau
       | Var vr => Var vr

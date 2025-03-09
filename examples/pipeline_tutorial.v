@@ -1,6 +1,6 @@
 (*! Tutorial: Simple arithmetic pipeline !*)
-Require Import Koika.Parsing.
 Require Import Koika.Frontend.
+Require Import Koika.TypedParsing.
 
 (*|
 ===========================================================
@@ -57,28 +57,25 @@ Definition Sigma (fn: ext_fn_t) : ExternalSignature :=
 Then we declare the rules of the system.  Notice how ``doG`` writes at port 0 and ``doF`` reads at port 1.  This is because we're building a pipelined queue, not a bypassing one, so we expect clients to pull first and push second.  Notice also that each rule is "guarded" by a call to ``fail``; that is, if ``doF`` can't push into the queue because ``doG`` is lagging then ``doF`` won't run at all, and if there's no data ready for ``doG`` to consume because ``doF`` isn't keeping up then ``doG`` won't run.
 |*)
 
-Definition _doF : uaction _ _ :=
-  {{
-     let v := read0(input_buffer) in
-     write0(input_buffer, extcall NextInput(v));
-     let queue_empty := read1(queue_empty) in
-     if queue_empty then
-       write1(queue_empty, Ob~0);
-       write0(queue_data, extcall F(v))
-     else
-       fail
-  }}.
+Definition _doF : action R Sigma := <{
+  let v := read0(input_buffer) in
+  write0(input_buffer, extcall NextInput(v));
+  let queue_empty := read1(queue_empty) in
+  if queue_empty then (
+    write1(queue_empty, Ob~0);
+    write0(queue_data, extcall F(v))
+  ) else fail
+}>.
 
-Definition _doG : uaction _ _ :=
-  {{
-      let queue_empty := read0(queue_empty) in
-      if !queue_empty then
-        let data := read0(queue_data) in
-        write0(output_buffer, extcall G(data));
-        write0(queue_empty, Ob~1)
-      else
-        fail
-  }}.
+Definition _doG : action R Sigma := <{
+  let queue_empty := read0(queue_empty) in
+  if !queue_empty then
+    let data := read0(queue_data) in
+    write0(output_buffer, extcall G(data));
+    write0(queue_empty, Ob~1)
+  else
+    fail
+}>.
 
 (*|
 Rules are written in an untyped language, so we need to typecheck them, which is done using ``tc_rules``:
@@ -88,9 +85,9 @@ Inductive rule_name_t :=
 | doF
 | doG.
 
-Definition rules : rule_name_t -> rule R Sigma :=
-  Eval vm_compute in
-    tc_rules R Sigma
+Definition rules : rule_name_t -> rule _ _ _ R Sigma :=
+  (* Eval vm_compute in *)
+    (* tc_rules R Sigma *)
              (fun rl => match rl with
                      | doF => _doF
                      | doG => _doG
@@ -297,7 +294,7 @@ Here is the stream of inputs consumed by the spec: we just iterate ``NextInput``
 |*)
 
     Definition spec_inputs :=
-      Streams.coiterate (σ NextInput) r.[input_buffer].
+      Streams.coiterate (σ NextInput) r?[input_buffer].
 
 (*|
 Here is the expected stream of outputs, which we call “observations”.  We only expect outputs to start becoming available after completing two cycles, so we simply state that the value in ``output_buffer`` should be unchanged until then:
@@ -305,8 +302,8 @@ Here is the expected stream of outputs, which we call “observations”.  We on
 
     Definition spec_observations :=
       let composed x := σ G (σ F x) in
-      r.[output_buffer] ::: (* Initial value *)
-      r.[output_buffer] ::: (* Unchanged after one cycle *)
+      r?[output_buffer] ::: (* Initial value *)
+      r?[output_buffer] ::: (* Unchanged after one cycle *)
       Streams.map composed spec_inputs. (* Actual outputs *)
 
 (*|
@@ -325,7 +322,7 @@ Finally, here is the actual stream of observations produced by the implementatio
 |*)
 
     Definition impl_observations :=
-      Streams.map (fun r => r.[output_buffer]) impl_trace.
+      Streams.map (fun r => r?[output_buffer]) impl_trace.
   End Spec.
 
 (*|
@@ -347,10 +344,10 @@ Here is our two-cycle characterization: if we execute our circuit twice, ``input
 
     Definition phi2 (r: ContextEnv.(env_t) R)
       : ContextEnv.(env_t) R :=
-      #{ input_buffer => σ NextInput (σ NextInput r.[input_buffer]);
+      #{ input_buffer => σ NextInput (σ NextInput r?[input_buffer]);
          queue_empty => Ob~0;
-         queue_data => σ F (σ NextInput r.[input_buffer]);
-         output_buffer => σ G (σ F r.[input_buffer]) }#.
+         queue_data => σ F (σ NextInput r?[input_buffer]);
+         output_buffer => σ G (σ F r?[input_buffer]) }#.
 
 (*|
 Proving this characterization is just a matter of abstract interpretation:
@@ -373,7 +370,7 @@ There are three cases: ``negb (Bits.single r.[queue_empty])``, in which both ``d
 To explore these cases we do a case split on ``r.[queue_empty]``, and simplify to show that they lead to the same result:
 |*)
 
-      destruct (Bits.single r.[queue_empty]); abstract_simpl. (* .unfold *)
+      destruct (Bits.single r?[queue_empty]); abstract_simpl. (* .unfold *)
       all: reflexivity.
     Qed.
 
@@ -384,7 +381,7 @@ With this done, we can now prove a stronger characterization that holds for any 
     Definition phi_iterated n
                (r: ContextEnv.(env_t) R)
       : ContextEnv.(env_t) R :=
-      let input := r.[input_buffer] in
+      let input := r?[input_buffer] in
       #{ input_buffer => iterate (S (S n)) (σ NextInput) input;
          queue_empty => Ob~0;
          queue_data => σ F (iterate (S n) (σ NextInput) input);
@@ -414,7 +411,7 @@ And this is enough to complete our proof!  We'll manually match up the first two
 
     Theorem correct_pipeline:
       forall (r: ContextEnv.(env_t) R),
-        r.[queue_empty] = Ob~1 ->
+        r?[queue_empty] = Ob~1 ->
         Streams.EqSt (impl_observations r) (spec_observations r).
     Proof.
       intros r Hqueue_empty.
@@ -473,7 +470,7 @@ Definition ext_fn_names fn :=
 
 Definition package :=
   {| ip_koika := {| koika_reg_types := R;
-                   koika_reg_init reg := r.[reg];
+                   koika_reg_init reg := r?[reg];
                    koika_ext_fn_types := Sigma;
                    koika_rules := rules;
                    koika_rule_external := external;

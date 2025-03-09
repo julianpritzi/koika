@@ -1,6 +1,6 @@
 (*! Save and restore simulation state !*)
 Require Import Koika.Frontend.
-Require Import Koika.Parsing.
+Require Import Koika.TypedParsing.
 
 Module SaveRestore.
   Inductive reg_t := counter.
@@ -16,14 +16,14 @@ Module SaveRestore.
     | counter => Bits.zero
     end.
 
-  Definition _increment_counter : uaction reg_t empty_ext_fn_t :=
-    {{ write0(counter, read0(counter) + |32`d1|) }}.
+  Definition _increment_counter : action R empty_Sigma :=
+    <{ write0(counter, read0(counter) + |32`d1|) }>.
 
   Definition save_restore : scheduler :=
     increment_counter |> done.
 
   Definition rules :=
-    tc_rules R empty_Sigma
+    (* tc_rules R empty_Sigma *)
              (fun r => match r with
                     | increment_counter => _increment_counter
                     end).

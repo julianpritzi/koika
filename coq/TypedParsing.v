@@ -93,12 +93,12 @@ Local Definition proof_tau_eq' {sig tau_in tau_out} {reg_t ext_fn_t}
 Arguments proof_tau_eq' {sig tau_in tau_out} {reg_t ext_fn_t} {R Sigma} & a proof : assert.
 Notation tau_eq a := (proof_tau_eq' a eq_refl).
 
-Local Definition proof_mem_eq {K} {sig} {k1 k2 : K} (m : member k1 sig) (proof : k1 = k2) : member k2 sig :=
+(* Local Definition proof_mem_eq {K} {sig} {k1 k2 : K} (m : member k1 sig) (proof : k1 = k2) : member k2 sig :=
     match proof with
     | eq_refl => m
     end.
 Arguments proof_mem_eq {K} {sig} {k1 k2} m & proof : assert.
-Notation mem_eq m := (proof_mem_eq m eq_refl).
+Notation mem_eq m := (proof_mem_eq m eq_refl). *)
 
 Declare Custom Entry koika_t.
 
@@ -173,20 +173,28 @@ end) sig :=
 | Member2Hd: forall k sig, member2 (k :: sig) k
 | Member2Tl: forall k k' sig, member2 sig k -> member2 (k' :: sig) k. *)
 
-Class VarRef (k: var_t) sig := var_ref : member (k, match assoc k sig with
-| Some a => a.1
-| None => unit_t
-end) sig.
+(* since typeclasses are only resolved after the normal type checking is done
+  the value of `tau` is not known during type checking - however some places need
+  to know the precise value of the variable, for that this new type more precise
+  type makes sure that the tau
+*)
+Definition get_type (k: var_t) sig : type :=
+  match assoc k sig with
+  | Some a => a.1
+  | None => unit_t
+  end.
+
+Class VarRef (k: var_t) sig := var_ref : member (k, get_type k sig) sig.
 Hint Mode VarRef + + : typeclass_instances.
 Arguments var_ref k & sig {VarRef} : assert.
 Hint Extern 1 (VarRef ?k ?sig) => exact (projT2 (must (assoc k sig))) : typeclass_instances.
 
 (* Get the instance out of an optional
  *)
-Class MustClass {A} (o : option A) := must_class : A.
+(* Class MustClass {A} (o : option A) := must_class : A.
 Hint Mode MustClass + + : typeclass_instances.
 Arguments must_class {A} o {MustClass} : assert.
-Hint Extern 1 (MustClass ?o) => exact (must o) : typeclass_instances.
+Hint Extern 1 (MustClass ?o) => exact (must o) : typeclass_instances. *)
 
 (* Koika_types *)
 (* TODO improve arg list to be more consistent on nil case  *)
@@ -217,10 +225,10 @@ Arguments refine_sig_tau sig tau {reg_t ext_fn_t} {R Sigma} & a : assert.
 
 (* TODO prevent unfolding of functions on simpl/cbn - Arguments : simpl never ??*)
 Notation "'fun' nm args ':' ret '=>' body" :=
-  (Build_InternalFunction' nm%string (refine_sig_tau args ret body))
+  (@Build_InternalFunction' string (action' _ _ (tau := ret) (sig := args)) nm body)
     (in custom koika_t at level 200, nm custom koika_t_var, args custom koika_t_binder, ret constr at level 0, right associativity, format "'[v' 'fun'  nm  args  ':'  ret  '=>' '/' body ']'").
 Notation "'fun' nm '()' ':' ret '=>' body" :=
-  (Build_InternalFunction' nm%string (refine_sig_tau nil ret body))
+  (@Build_InternalFunction' string (action' _ _ (tau := ret) (sig := nil)) nm body)
     (in custom koika_t at level 200, nm custom koika_t_var, ret constr at level 0, right associativity, format "'[v' 'fun'  nm  '()'   ':'  ret  '=>' '/' body ']'").
 
 Notation "'assert' a 'in' c"          := (If a c (Const Ob)) (in custom koika_t at level 200, right associativity, format "'[v' 'assert'  a '/' 'in'  c ']'").
@@ -330,18 +338,31 @@ Notation "'#' s" := (Const (tau := bits_t _) s) (in custom koika_t at level 0, s
  *   Some of the literal notations also start with an identifier.
  *   Thus, the same restrictions apply.
  *)
+
+
+(* This is necessary - simply using member is not enough - same argument cannot be input + output *)
+Class VarCtxMember {var_t} {t : type} (k : var_t) sig :=
+  var_ctx_member : member (k,t) sig.
+Arguments var_ctx_member {var_t} {t} k sig {VarCtxMember}.
+Instance VarCtxMemberHd {var_t} {t : type} (k : var_t) sig : @VarCtxMember _ t k ((k,t) :: sig) :=
+  MemberHd (k,t) sig.
+Instance VarCtxMemberTl {var_t} {t t' : type} {k'} k sig (m : @VarCtxMember _ t k sig) : @VarCtxMember var_t t k ((k',t') :: sig) :=
+  MemberTl (k,t) (k',t') sig (@var_ctx_member _ _ _ _ m).
+Hint Mode VarCtxMember - - + +  : typeclass_instances.
+
 (* Definition Var
   {reg_t ext_fn_t}
   {R : reg_t -> type}
   {Sigma : ext_fn_t -> ExternalSignature}
   {sig} (k: var_t) : action' R Sigma (sig := sig) (tau := (must_class (assoc k _)).1). *)
-Notation "a" := (Var (k := ident_to_string a) _) (in custom koika_t at level 0, a constr at level 0, only parsing).
+Notation "a" := (Var (var_ctx_member (ident_to_string a) _)) (in custom koika_t at level 0, a constr at level 0, only parsing).
 (* Notation "a" := (Var (mem_eq (var_ref (ident_to_string a) _))) (in custom koika_t at level 0, a constr at level 0, only parsing). *)
 Notation "a" := (Var a) (in custom koika_t at level 0, a constr at level 0, only printing).
 
-Existing Class member.
+
+(* Existing Class member.
 #[export] Existing Instance MemberHd.
-#[export] Existing Instance MemberTl.
+#[export] Existing Instance MemberTl. *)
 
 (* TODO:
 One last suggestion, add this to avoid infinite loops when the list is accidentally left unspecified:
@@ -776,11 +797,11 @@ Section Tests'.
     write0(reg2, `tau_eq <{0b"1"1 ++ read0(reg3)}>`);
   }>.
 
-  Definition idk5 : @TypedSyntax.action unit string string _ _ R Sigma [("a", R' reg3)] (bits_t 4) := (@Var _ _ _ _ _ _ _ [("a", R' reg3)] "a" (_) (must_class (assoc "a" _)).2).
+  (* Definition idk5 : @TypedSyntax.action unit string string _ _ R Sigma [("a", R' reg3)] (bits_t 4) := (@Var _ _ _ _ _ _ _ [("a", R' reg3)] "a" (_) (must_class (assoc "a" _)).2). *)
 
   Arguments Var {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & {k tau} m : assert.
 
-  Definition idk6 : @TypedSyntax.action unit string string _ _ R Sigma [("a", R' reg3)] (bits_t 4) := Var (k := "a") _.
+  Definition idk6 : @TypedSyntax.action unit string string _ _ R Sigma [("a", R' reg3)] (bits_t 4) := Var (var_ctx_member "a" _).
 
   Definition read_reg : action' R' Sigma (sig := [("a", R' reg3)]) (tau := bits_t 4) := <{
     a
