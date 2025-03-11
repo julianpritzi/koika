@@ -82,16 +82,16 @@ but has type ?a + ?b -> need bidirectionaly but not possible here
  * to prevent type errors
  * e.g. on the condition of the if statement
  *)
-Local Definition proof_tau_eq' {sig tau_in tau_out} {reg_t ext_fn_t}
-  {R : reg_t -> type} {Sigma : ext_fn_t -> ExternalSignature}
+Local Definition delay_tau_uni {reg_t ext_fn_t}
+  {R : reg_t -> type} {Sigma : ext_fn_t -> ExternalSignature} {sig tau_in tau_out}
   (a : action' R Sigma (tau := tau_in) (sig := sig))
   (proof : tau_in = tau_out)
   : action' R Sigma (tau := tau_out) (sig := sig) :=
     match proof with
     | eq_refl => a
     end.
-Arguments proof_tau_eq' {sig tau_in tau_out} {reg_t ext_fn_t} {R Sigma} & a proof : assert.
-Notation tau_eq a := (proof_tau_eq' a eq_refl).
+Arguments delay_tau_uni {reg_t ext_fn_t} {R Sigma} {sig tau_in tau_out} & a proof : assert.
+Notation delay_tau a := (delay_tau_uni a eq_refl).
 
 (* Local Definition proof_mem_eq {K} {sig} {k1 k2 : K} (m : member k1 sig) (proof : k1 = k2) : member k2 sig :=
     match proof with
@@ -104,7 +104,7 @@ Declare Custom Entry koika_t.
 
 (* This is the entry point to transition from normal
   coq (constr) to koika *)
-Notation "'<{' e '}>'" := (e) (e custom koika_t).
+Notation "'<{' e '}>'" := ltac:(e) (e custom koika_t).
 
 (* Koika_var *)
 Declare Custom Entry koika_t_var.
@@ -218,74 +218,74 @@ Notation "a  ..  b" := (cons a ..  (cons b nil) ..)  (in custom koika_t_binder a
  * To tell coq to infer it from the definition we need
  * bidirectionality hints and thus we need a seperate function.
  *)
-Local Definition refine_sig_tau sig tau {reg_t ext_fn_t}
+(* Local Definition refine_sig_tau sig tau {reg_t ext_fn_t}
   {R : reg_t -> type} {Sigma : ext_fn_t -> ExternalSignature}
   (a : action' R Sigma (tau := tau) (sig := sig)) : action' R Sigma := a.
-Arguments refine_sig_tau sig tau {reg_t ext_fn_t} {R Sigma} & a : assert.
+Arguments refine_sig_tau sig tau {reg_t ext_fn_t} {R Sigma} & a : assert. *)
 
 (* TODO prevent unfolding of functions on simpl/cbn - Arguments : simpl never ??*)
 Notation "'fun' nm args ':' ret '=>' body" :=
-  (@Build_InternalFunction' string (action' _ _ (tau := ret) (sig := args)) nm body)
+  (@Build_InternalFunction' string (action' _ _ (tau := ret) (sig := args)) nm (delay_tau body))
     (in custom koika_t at level 200, nm custom koika_t_var, args custom koika_t_binder, ret constr at level 0, right associativity, format "'[v' 'fun'  nm  args  ':'  ret  '=>' '/' body ']'").
 Notation "'fun' nm '()' ':' ret '=>' body" :=
-  (@Build_InternalFunction' string (action' _ _ (tau := ret) (sig := nil)) nm body)
+  (@Build_InternalFunction' string (action' _ _ (tau := ret) (sig := nil)) nm (delay_tau  body))
     (in custom koika_t at level 200, nm custom koika_t_var, ret constr at level 0, right associativity, format "'[v' 'fun'  nm  '()'   ':'  ret  '=>' '/' body ']'").
 
-Notation "'assert' a 'in' c"          := (If a c (Const Ob)) (in custom koika_t at level 200, right associativity, format "'[v' 'assert'  a '/' 'in'  c ']'").
-Notation "'assert' a 'else' b 'in' c" := (If a c b         ) (in custom koika_t at level 200, right associativity, format "'[v' 'assert'  a '/' 'else'  b '/' 'in'  c ']'").
-Notation "'when' a 'do' t "           := (If a t (Const Ob)) (in custom koika_t at level 200, right associativity, format "'[v' 'when'  a '/' 'do'  t '/' ']'").
+Notation "'assert' a 'in' c"          := (If (delay_tau a) c (Const (tau := unit_t) Ob)) (in custom koika_t at level 200, right associativity, format "'[v' 'assert'  a '/' 'in'  c ']'").
+Notation "'assert' a 'else' b 'in' c" := (If (delay_tau a) c (delay_tau b         )) (in custom koika_t at level 200, right associativity, format "'[v' 'assert'  a '/' 'else'  b '/' 'in'  c ']'").
+Notation "'when' a 'do' t "           := (If (delay_tau a) t (Const (tau := unit_t) Ob)) (in custom koika_t at level 200, right associativity, format "'[v' 'when'  a '/' 'do'  t '/' ']'").
 
 Notation "'let' a ':=' b 'in' c" := (Bind a b c) (in custom koika_t at level 200, a custom koika_t_var, right associativity, format "'[v' 'let'  a  ':='  b  'in' '/' c ']'").
 Notation "'let' a ':' typ ':=' b 'in' c" := (Bind (tau := typ) a b c) (in custom koika_t at level 200,
   a custom koika_t_var,
   typ constr at level 0, right associativity, format "'[v' 'let'  a  ':' typ ':='  b  'in' '/' c ']'").
 
-Notation "a ';' b" := (Seq a                          b) (in custom koika_t at level 90, b at level 200, format "'[v' a ';' '/' b ']'" ).
-Notation "a ';'"   := (Seq a (Const (tau := unit_t) Ob)) (in custom koika_t at level 90). (* trailing comma *)
+Notation "a ';' b" := (Seq (delay_tau a)                          b) (in custom koika_t at level 90, b at level 200, format "'[v' a ';' '/' b ']'" ).
+Notation "a ';'"   := (Seq (delay_tau a) (Const (tau := unit_t) Ob)) (in custom koika_t at level 90). (* trailing comma *)
 
-Notation "'set' a ':=' b" := (Assign (var_ref a _) b) (in custom koika_t at level 89, a custom koika_t_var, only parsing).
+Notation "'set' a ':=' b" := (Assign (var_ref a _) (delay_tau b)) (in custom koika_t at level 89, a custom koika_t_var, only parsing).
 
-Notation "'if' a 'then' t"            := (If a t                  (Const (tau := unit_t) Ob)) (in custom koika_t at level 89, t custom koika_t at level 89, right associativity, format "'[v' if  a '/' then  t ']'").
-Notation "'if' a 'then' t 'else' f"   := (If a t                  f                         ) (in custom koika_t at level 89, t custom koika_t at level 89, right associativity, format "'[v' if  a '/' then  t '/' else  f ']'").
-Notation "'guard' '(' a ')' "         := (If (Unop (Bits1 (Not _)) a) (Fail (unit_t)) (Const Ob)) (in custom koika_t at level 89, right associativity, format "'guard' '(' a ')'").
+Notation "'if' a 'then' t"            := (If (delay_tau a) t             (Const (tau := unit_t) Ob)) (in custom koika_t at level 89, t custom koika_t at level 89, right associativity, format "'[v' if  a '/' then  t ']'").
+Notation "'if' a 'then' t 'else' f"   := (If (delay_tau a) t                          (delay_tau f)) (in custom koika_t at level 89, t custom koika_t at level 89, right associativity, format "'[v' if  a '/' then  t '/' else  f ']'").
+Notation "'guard' '(' a ')' "         := (If (delay_tau a) (Const (tau := unit_t) Ob) (Fail unit_t)) (in custom koika_t at level 89, right associativity, format "'guard' '(' a ')'").
 
 (* Inspired by cpp the precedence  *)
 (* https://en.cppreference.com/w/cpp/language/operator_precedence *)
 (* TODO id really prefer to use || and && for logical operations and & | for bitwise *)
 (* Bit operations *)
-Notation "a  '||'  b"  := (Binop (Bits2 (Or       _))          a b) (in custom koika_t at level 85).
-Notation "a  '^'  b"   := (Binop (Bits2 (Xor      _))          a b) (in custom koika_t at level 84).
-Notation "a  '&&'  b"  := (Binop (Bits2 (And      _))          a b) (in custom koika_t at level 83).
+Notation "a  '||'  b"  := (Binop (Bits2 (Or       _))          (delay_tau a) (delay_tau b)) (in custom koika_t at level 85).
+Notation "a  '^'  b"   := (Binop (Bits2 (Xor      _))          (delay_tau a) (delay_tau b)) (in custom koika_t at level 84).
+Notation "a  '&&'  b"  := (Binop (Bits2 (And      _))          (delay_tau a) (delay_tau b)) (in custom koika_t at level 83).
 
 (* Comparisons *)
-Notation "a  '!='  b"  := (Binop (Eq _ true)                   a b) (in custom koika_t at level 80).
-Notation "a  '=='  b"  := (Binop (Eq _ false)                  a b) (in custom koika_t at level 80).
+Notation "a  '!='  b"  := (Binop (Eq _ true)                   (delay_tau a) (delay_tau b)) (in custom koika_t at level 80).
+Notation "a  '=='  b"  := (Binop (Eq _ false)                  (delay_tau a) (delay_tau b)) (in custom koika_t at level 80).
 
-Notation "a  '<'  b"   := (Binop (Bits2 (Compare false cLt _)) a b) (in custom koika_t at level 79).
-Notation "a  '<s'  b"  := (Binop (Bits2 (Compare true  cLt _)) a b) (in custom koika_t at level 79).
-Notation "a  '<='  b"  := (Binop (Bits2 (Compare false cLe _)) a b) (in custom koika_t at level 79).
-Notation "a  '<s='  b" := (Binop (Bits2 (Compare true  cLe _)) a b) (in custom koika_t at level 79).
-Notation "a  '>'  b"   := (Binop (Bits2 (Compare false cGt _)) a b) (in custom koika_t at level 79).
-Notation "a  '>s'  b"  := (Binop (Bits2 (Compare true  cGt _)) a b) (in custom koika_t at level 79).
-Notation "a  '>='  b"  := (Binop (Bits2 (Compare false cGe _)) a b) (in custom koika_t at level 79).
-Notation "a  '>s='  b" := (Binop (Bits2 (Compare true  cGe _)) a b) (in custom koika_t at level 79).
+Notation "a  '<'  b"   := (Binop (Bits2 (Compare false cLt _)) (delay_tau a) (delay_tau b)) (in custom koika_t at level 79).
+Notation "a  '<s'  b"  := (Binop (Bits2 (Compare true  cLt _)) (delay_tau a) (delay_tau b)) (in custom koika_t at level 79).
+Notation "a  '<='  b"  := (Binop (Bits2 (Compare false cLe _)) (delay_tau a) (delay_tau b)) (in custom koika_t at level 79).
+Notation "a  '<s='  b" := (Binop (Bits2 (Compare true  cLe _)) (delay_tau a) (delay_tau b)) (in custom koika_t at level 79).
+Notation "a  '>'  b"   := (Binop (Bits2 (Compare false cGt _)) (delay_tau a) (delay_tau b)) (in custom koika_t at level 79).
+Notation "a  '>s'  b"  := (Binop (Bits2 (Compare true  cGt _)) (delay_tau a) (delay_tau b)) (in custom koika_t at level 79).
+Notation "a  '>='  b"  := (Binop (Bits2 (Compare false cGe _)) (delay_tau a) (delay_tau b)) (in custom koika_t at level 79).
+Notation "a  '>s='  b" := (Binop (Bits2 (Compare true  cGe _)) (delay_tau a) (delay_tau b)) (in custom koika_t at level 79).
 
 (* Bit concatenation / shifts *)
-Notation "a  '++'  b"  := (Binop (Bits2 (Concat _ _))          a b) (in custom koika_t at level 75).
-Notation "a  '>>'  b"  := (Binop (Bits2 (Lsr _ _))             a b)  (in custom koika_t at level 74).
-Notation "a  '>>>'  b" := (Binop (Bits2 (Asr _ _))             a b)  (in custom koika_t at level 74).
-Notation "a  '<<'  b"  := (Binop (Bits2 (Lsl _ _))             a b)  (in custom koika_t at level 74).
+Notation "a  '++'  b"  := (Binop (Bits2 (Concat _ _))          (delay_tau a) (delay_tau b)) (in custom koika_t at level 75).
+Notation "a  '>>'  b"  := (Binop (Bits2 (Lsr _ _))             (delay_tau a) (delay_tau b)) (in custom koika_t at level 74).
+Notation "a  '>>>'  b" := (Binop (Bits2 (Asr _ _))             (delay_tau a) (delay_tau b)) (in custom koika_t at level 74).
+Notation "a  '<<'  b"  := (Binop (Bits2 (Lsl _ _))             (delay_tau a) (delay_tau b)) (in custom koika_t at level 74).
 
 (* Arithmetic *)
-Notation "a  '+'  b"   := (Binop (Bits2 (Plus     _))          a b) (in custom koika_t at level 70).
-Notation "a  '-'  b"   := (Binop (Bits2 (Minus    _))          a b) (in custom koika_t at level 70).
-Notation "a  '*'  b"   := (Binop (Bits2 (Mul    _ _))          a b) (in custom koika_t at level 69).
+Notation "a  '+'  b"   := (Binop (Bits2 (Plus     _))          (delay_tau a) (delay_tau b)) (in custom koika_t at level 70).
+Notation "a  '-'  b"   := (Binop (Bits2 (Minus    _))          (delay_tau a) (delay_tau b)) (in custom koika_t at level 70).
+Notation "a  '*'  b"   := (Binop (Bits2 (Mul    _ _))          (delay_tau a) (delay_tau b)) (in custom koika_t at level 69).
 
 (* Unary operators *)
-Notation "'!' a"       := (Unop  (Bits1 (Not _))               a  ) (in custom koika_t at level 65, format "'!' a").
+Notation "'!' a"       := (Unop  (Bits1 (Not _))               (delay_tau a)) (in custom koika_t at level 65, format "'!' a").
 
-Notation "a '[' b ']'"        := (Binop (Bits2 (Sel _))            a b) (in custom koika_t at level 60, format "'[' a [ b ] ']'").
-Notation "a '[' b ':+' c ']'" := (Binop (Bits2 (IndexedSlice _ c)) a b) (in custom koika_t at level 60, c constr at level 0, format "'[' a [ b :+ c ] ']'").
+Notation "a '[' b ']'"        := (Binop (Bits2 (Sel _))            (delay_tau a) (delay_tau b)) (in custom koika_t at level 60, format "'[' a [ b ] ']'").
+Notation "a '[' b ':+' c ']'" := (Binop (Bits2 (IndexedSlice _ c)) (delay_tau a) (delay_tau b)) (in custom koika_t at level 60, c constr at level 0, format "'[' a [ b :+ c ] ']'").
 
 
 Class TypeOfSig {sig : Type} (s : sig) := type_of_sig : type.
@@ -294,10 +294,10 @@ Class TypeOfSig {sig : Type} (s : sig) := type_of_sig : type.
 #[export] Instance type_of_array_sig  {s} : @TypeOfSig array_sig  s := array_t s.
 Arguments type_of_sig {sig} s {TypeOfSig} : assert.
 
-Notation "expr : sig" := (Unop (Conv (type_of_sig sig) Unpack) expr)
+Notation "expr : sig" := (Unop (Conv (type_of_sig sig) Unpack) (delay_tau expr))
   (in custom koika_t at level 2, sig constr at level 0).
 
-Notation "expr : 'bits'" := (Unop (Conv _ Pack) expr)
+Notation "expr : 'bits'" := (Unop (Conv _ Pack) (delay_tau expr))
   (in custom koika_t at level 2).
 
 (* for some reason, using struct_idx coq can infer the parameter
@@ -310,7 +310,7 @@ Arguments struct_idx sig f {StructIdx} : assert.
 Hint Extern 1 (StructIdx ?sig ?f) => exact (must (List_assoc f sig.(struct_fields))) : typeclass_instances.
 
 Notation "v '.[' f ']'" :=
-  (Unop  (Struct1 GetField   _ (struct_idx _ f)) v)
+  (Unop (Struct1 GetField _ (struct_idx _ f)) (delay_tau v))
   (in custom koika_t at level 0, f custom koika_t_var, format "v .[ f ]").
 
 Notation "'`' a '`'" := (a) (in custom koika_t, a constr).
@@ -339,46 +339,15 @@ Notation "'#' s" := (Const (tau := bits_t _) s) (in custom koika_t at level 0, s
  *   Thus, the same restrictions apply.
  *)
 
-
-(* This is necessary - simply using member is not enough - same argument cannot be input + output *)
-Class VarCtxMember {var_t} {t : type} (k : var_t) sig :=
-  var_ctx_member : member (k,t) sig.
-Arguments var_ctx_member {var_t} {t} k sig {VarCtxMember}.
-Instance VarCtxMemberHd {var_t} {t : type} (k : var_t) sig : @VarCtxMember _ t k ((k,t) :: sig) :=
-  MemberHd (k,t) sig.
-Instance VarCtxMemberTl {var_t} {t t' : type} {k'} k sig (m : @VarCtxMember _ t k sig) : @VarCtxMember var_t t k ((k',t') :: sig) :=
-  MemberTl (k,t) (k',t') sig (@var_ctx_member _ _ _ _ m).
-Hint Mode VarCtxMember - - + +  : typeclass_instances.
-
-(* Definition Var
-  {reg_t ext_fn_t}
-  {R : reg_t -> type}
-  {Sigma : ext_fn_t -> ExternalSignature}
-  {sig} (k: var_t) : action' R Sigma (sig := sig) (tau := (must_class (assoc k _)).1). *)
-Notation "a" := (Var (var_ctx_member (ident_to_string a) _)) (in custom koika_t at level 0, a constr at level 0, only parsing).
+Notation "a" := (Var (var_ref (ident_to_string a) _)) (in custom koika_t at level 0, a constr at level 0, only parsing).
 (* Notation "a" := (Var (mem_eq (var_ref (ident_to_string a) _))) (in custom koika_t at level 0, a constr at level 0, only parsing). *)
 Notation "a" := (Var a) (in custom koika_t at level 0, a constr at level 0, only printing).
-
-
-(* Existing Class member.
-#[export] Existing Instance MemberHd.
-#[export] Existing Instance MemberTl. *)
-
-(* TODO:
-One last suggestion, add this to avoid infinite loops when the list is accidentally left unspecified:
-Hint Mode In ! ! ! : typeclass_instances.
-*)
-
-(* Definition test : member ("a", _) [("a", nat)] := _.
-Definition test' : member ("a", _) [("a", nat); ("b", bool)] := _.
-Definition test'' : member ("a", _) [("b", nat); ("a", bool)] := _.
-Definition test'' : member ("a", _) [("b", nat); ("c", bool)] := _. *)
 
 (* Alternative shorter set syntax
  * Note: expr is level 89 to stay below ';' *)
 Export (hints) IdentParsing.TC.
-Notation "a ':=' b" := (let aa := (TC.ident_to_string a) in Assign (var_ref aa _) b) (in custom koika_t at level 0, a constr at level 0, b custom koika_t at level 89, only parsing).
-Notation "a ':=' b" := (                                    Assign a b             ) (in custom koika_t at level 0, a constr at level 0, b custom koika_t at level 89, only printing).
+Notation "a ':=' b" := (let aa := (TC.ident_to_string a) in Assign (var_ref aa _) (delay_tau b)) (in custom koika_t at level 0, a constr at level 0, b custom koika_t at level 89, only parsing).
+Notation "a ':=' b" := (                                    Assign a              (delay_tau b)) (in custom koika_t at level 0, a constr at level 0, b custom koika_t at level 89, only printing).
 
 (* Koika_args *)
 (* TODO support trailing comma *)
@@ -387,6 +356,7 @@ Notation "'(' x ',' .. ',' y ')'" := (CtxCons (_,_) (x) .. (CtxCons (_,_) (y) Ct
 Notation "'(' ')'" := (CtxEmpty) (in custom koika_t_args).
 Notation "'()'"    := (CtxEmpty) (in custom koika_t_args).
 
+(* TODO generalize delay_tau for a whole argument context *)
 Notation "fn args" :=
   (InternalCall fn args)
     (in custom koika_t at level 0, fn constr at level 0, args custom koika_t_args, only parsing).
@@ -415,30 +385,30 @@ Notation "'fail'"            := (Fail     unit_t) (in custom koika_t, format "'f
 Notation "'fail' '(' t ')'"  := (Fail (bits_t t)) (in custom koika_t, t constr, format "'fail' '(' t ')'").
 Notation "'fail' '@(' t ')'" := (Fail          t) (in custom koika_t, t constr ,format "'fail' '@(' t ')'").
 
-Notation "'read0' '(' reg ')' "           := (Read P0 reg)        (in custom koika_t, reg constr, format "'read0' '(' reg ')'").
-Notation "'read1' '(' reg ')' "           := (Read P1 reg)        (in custom koika_t, reg constr, format "'read1' '(' reg ')'").
-Notation "'write0' '(' reg ',' value ')'" := (refine_sig_tau _ _ (Write P0 reg value)) (in custom koika_t, reg constr, format "'write0' '(' reg ',' value ')'").
-Notation "'write1' '(' reg ',' value ')'" := (refine_sig_tau _ _ (Write P1 reg value)) (in custom koika_t, reg constr, format "'write1' '(' reg ',' value ')'").
+Notation "'read0' '(' reg ')' "       := (Read P0 reg)                (in custom koika_t, reg constr, format "'read0' '(' reg ')'").
+Notation "'read1' '(' reg ')' "       := (Read P1 reg)                (in custom koika_t, reg constr, format "'read1' '(' reg ')'").
+Notation "'write0' '(' reg ',' v ')'" := (Write P0 reg (delay_tau v)) (in custom koika_t, reg constr, format "'write0' '(' reg ',' v ')'").
+Notation "'write1' '(' reg ',' v ')'" := (Write P1 reg (delay_tau v)) (in custom koika_t, reg constr, format "'write1' '(' reg ',' v ')'").
 
-Notation "'zeroExtend(' a ',' b ')'" := (Unop (Bits1 (ZExtL _ b)) a) (in custom koika_t, b constr, format "'zeroExtend(' a ',' b ')'").
-Notation "'sext(' a ',' b ')'"       := (Unop (Bits1 (SExt  _ b)) a) (in custom koika_t, b constr, format "'sext(' a ',' b ')'").
+Notation "'zeroExtend(' a ',' b ')'" := (Unop (Bits1 (ZExtL _ b)) (delay_tau a)) (in custom koika_t, b constr, format "'zeroExtend(' a ',' b ')'").
+Notation "'sext(' a ',' b ')'"       := (Unop (Bits1 (SExt  _ b)) (delay_tau a)) (in custom koika_t, b constr, format "'sext(' a ',' b ')'").
 
-Notation "'ignore(' a ')'"           := (Unop (Conv _ Ignore)     a) (in custom koika_t).
-Notation "'pack(' a ')'"             := (Unop (Conv _ Pack)       a) (in custom koika_t).
-Notation "'unpack(' t ',' v ')'"     := (Unop (Conv t Unpack)     v) (in custom koika_t, t constr).
+Notation "'ignore(' a ')'"       := (Unop (Conv _ Ignore) (delay_tau a)) (in custom koika_t).
+Notation "'pack(' a ')'"         := (Unop (Conv _ Pack)   (delay_tau a)) (in custom koika_t).
+Notation "'unpack(' t ',' v ')'" := (Unop (Conv t Unpack) (delay_tau v)) (in custom koika_t, t constr).
 
-Notation "'extcall' method '(' arg ')'" := (ExternalCall method arg) (in custom koika_t, method constr at level 0).
+Notation "'extcall' method '(' arg ')'" := (ExternalCall method (delay_tau arg)) (in custom koika_t, method constr at level 0).
 
 Notation "'subst' '(' v ',' f ',' a ')'" :=
-  (Binop (Struct2 SubstField _ (struct_idx _ f)) v a)
+  (Binop (Struct2 SubstField _ (struct_idx _ f)) (delay_tau v) (delay_tau a))
   (in custom koika_t, f custom koika_t_var, format "'subst' '(' v ','  f ',' a ')'").
 
 Notation "'getbits@' sig '(' v ',' f ')'" :=
-  (Unop  (Bits1 (GetFieldBits   sig (must (List_assoc f sig.(struct_fields))))) v)
+  (Unop  (Bits1 (GetFieldBits   sig (must (List_assoc f sig.(struct_fields))))) (delay_tau v))
   (in custom koika_t, sig constr at level 0, f custom koika_t_var,
     format "'getbits@' sig '(' v ','  f ')'").
 Notation "'substbits@' sig '(' v ',' f ',' a ')'" :=
-  (Binop (Bits2 (SubstFieldBits sig (must (List_assoc f sig.(struct_fields))))) v a)
+  (Binop (Bits2 (SubstFieldBits sig (must (List_assoc f sig.(struct_fields))))) (delay_tau v) (delay_tau a))
   (in custom koika_t, sig constr at level 0, f custom koika_t_var,
     format "'substbits@' sig '(' v ','  f ','  a ')'").
 
@@ -494,7 +464,7 @@ Notation "bs '~' '1'" := (Bits.cons  true bs) (in custom koika_t_consts at level
 
 Notation "'Ob' '~' number" := (Const (tau := bits_t _) number)
   (in custom koika_t at level 0, number custom koika_t_consts, format "'Ob' '~' number").
-Notation "'Ob'" := (Const (tau := bits_t 0) Ob)
+Notation "'Ob'" := (Const (tau := unit_t) Ob)
   (in custom koika_t at level 0, format "'Ob'").
 
 (* koika bit vector literals *)
@@ -747,23 +717,23 @@ End BidirectionalityHintsTest.
 
 
 (* Nothing needs to be inferred from the context  *)
-Arguments Fail         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} tau & : assert.
-Arguments Var          {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} {k tau} m : assert.
-Arguments Const        {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} & cst : assert.
-Arguments Assign       {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & {k tau} m ex : assert.
-Arguments Seq          {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} & r1 r2 : assert.
-Arguments Bind         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} & {tau'} var ex body : assert.
-Arguments If           {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} & cond tbranch fbranch : assert.
-Arguments Read         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} port idx & : assert.
-Arguments Write        {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} port idx & value : assert.
-Arguments Unop         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} fn & arg1 : assert.
-Arguments Binop        {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} fn & arg1 arg2 : assert.
-Arguments ExternalCall {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} fn & arg : assert.
-Arguments InternalCall {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} {argspec} & fn args : assert.
-Arguments APos         {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig tau} & pos a : assert.
+Arguments Fail         {pos_t var_t fn_name_t reg_t ext_fn_t}   {R Sigma} {sig} tau : assert.
+Arguments Var          {pos_t var_t fn_name_t reg_t ext_fn_t} & {R Sigma} {sig} {k tau} m : assert.
+Arguments Const        {pos_t var_t fn_name_t reg_t ext_fn_t}   {R Sigma} {sig tau} cst : assert.
+Arguments Assign       {pos_t var_t fn_name_t reg_t ext_fn_t} & {R Sigma} {sig} {k tau} m ex : assert.
+Arguments Seq          {pos_t var_t fn_name_t reg_t ext_fn_t} & {R Sigma} {sig tau} r1 r2 : assert.
+Arguments Bind         {pos_t var_t fn_name_t reg_t ext_fn_t} & {R Sigma} {sig tau} {tau'} var ex body : assert.
+Arguments If           {pos_t var_t fn_name_t reg_t ext_fn_t} & {R Sigma} {sig tau} cond tbranch fbranch : assert.
+Arguments Read         {pos_t var_t fn_name_t reg_t ext_fn_t} & {R Sigma} {sig} port idx : assert.
+Arguments Write        {pos_t var_t fn_name_t reg_t ext_fn_t} & {R Sigma} {sig} port idx value : assert.
+Arguments Unop         {pos_t var_t fn_name_t reg_t ext_fn_t} & {R Sigma} {sig} fn arg1 : assert.
+Arguments Binop        {pos_t var_t fn_name_t reg_t ext_fn_t} & {R Sigma} {sig} fn arg1 arg2 : assert.
+Arguments ExternalCall {pos_t var_t fn_name_t reg_t ext_fn_t} & {R Sigma} {sig} fn arg : assert.
+Arguments InternalCall {pos_t var_t fn_name_t reg_t ext_fn_t} & {R Sigma} {sig tau} {argspec} fn args : assert.
+(* Arguments APos         {pos_t var_t fn_name_t reg_t ext_fn_t} & {R Sigma} {sig tau} pos a : assert. *)
 Arguments Build_InternalFunction' {fn_name_t action} & int_name int_body : assert.
-Arguments macro_switch {reg_t ext_fn_t} {R Sigma} {sig} & {tau tau_arg} var default branches : assert.
-Arguments struct_init {reg_t ext_fn_t} {R Sigma} {sig} & s_sig fields : assert.
+Arguments macro_switch {reg_t ext_fn_t} & {R Sigma} {sig} {tau tau_arg} var default branches : assert.
+Arguments struct_init  {reg_t ext_fn_t} & {R Sigma} {sig} s_sig fields : assert.
 
 (* TODO: what does this? *)
 (* Set Typeclasses Dependency Order. *)
@@ -793,15 +763,15 @@ Section Tests'.
   Context {ext_fn_t : Type}.
   Context {Sigma : ext_fn_t -> ExternalSignature}.
 
-  Definition test_concatenation : action' R' Sigma (sig := [("yo", bits_t 4)]) := <{
-    write0(reg2, `tau_eq <{0b"1"1 ++ read0(reg3)}>`);
+  Definition test_concatenation2 : action' R' Sigma (sig := [("yo", bits_t 4)]) := <{
+    write0(reg2, Ob~1 ++ read0(reg3));
   }>.
 
   (* Definition idk5 : @TypedSyntax.action unit string string _ _ R Sigma [("a", R' reg3)] (bits_t 4) := (@Var _ _ _ _ _ _ _ [("a", R' reg3)] "a" (_) (must_class (assoc "a" _)).2). *)
 
   Arguments Var {pos_t var_t fn_name_t reg_t ext_fn_t} {R Sigma} {sig} & {k tau} m : assert.
 
-  Definition idk6 : @TypedSyntax.action unit string string _ _ R Sigma [("a", R' reg3)] (bits_t 4) := Var (var_ctx_member "a" _).
+  Definition idk6 : @TypedSyntax.action unit string string _ _ R Sigma [("a", R' reg3)] (bits_t 4) := delay_tau (Var (var_ref "a" _)).
 
   Definition read_reg : action' R' Sigma (sig := [("a", R' reg3)]) (tau := bits_t 4) := <{
     a
