@@ -40,46 +40,43 @@ Module GCDMachine.
     | output_data => Bits.zero
     end.
 
-  Definition gcd_start : action R Sigma :=
-    <{
-        if read0(input_valid) == Ob~1 && !read0(gcd_busy) then
-          let data := read0(input_data) in
-          write0(gcd_a, get(data, a));
-          write0(gcd_b, get(data, b));
-          write0(gcd_busy, Ob~1);
-          write0(input_valid, Ob~0)
-        else
-          fail
-    }>.
+  Definition gcd_start : action R Sigma := <{
+    if read0(input_valid) == Ob~1 && !read0(gcd_busy) then
+      let data := read0(input_data) in
+      write0(gcd_a, data.[a]);
+      write0(gcd_b, data.[b]);
+      write0(gcd_busy, Ob~1);
+      write0(input_valid, Ob~0)
+    else
+      fail
+  }>.
 
-  Definition gcd_compute : uaction reg_t ext_fn_t :=
-    {{
-        let a := read0(gcd_a) in
-        let b := read0(gcd_b) in
-        if a != |16`d0| then
-          if a < b then
-            write0(gcd_b, a);
-            write0(gcd_a, b)
-          else
-            write0(gcd_a, a - b)
-        else
-          fail
-    }}.
+  Definition gcd_compute : action R Sigma := <{
+    let a := read0(gcd_a) in
+    let b := read0(gcd_b) in
+    if a != |16`d0| then
+      if a < b then (
+        write0(gcd_b, a);
+        write0(gcd_a, b)
+      ) else
+        write0(gcd_a, a - b)
+    else
+      fail
+  }>.
 
-  Definition gcd_get_result : uaction reg_t ext_fn_t :=
-    {{
-        if (read1(gcd_a) == |16`d0|) && read0(gcd_busy) then
-          write0(gcd_busy, Ob~0);
-          write0(output_data, read1(gcd_b))
-        else
-          fail
-    }}.
+  Definition gcd_get_result : action R Sigma := <{
+    if (read1(gcd_a) == |16`d0|) && read0(gcd_busy) then (
+      write0(gcd_busy, Ob~0);
+      write0(output_data, read1(gcd_b))
+    ) else
+      fail
+  }>.
 
   Inductive rule_name_t :=
     start | step_compute | get_result.
 
   Definition rules :=
-    tc_rules R empty_Sigma
+    (* tc_rules R empty_Sigma *)
              (fun rl => match rl with
                      | start => gcd_start
                      | step_compute => gcd_compute

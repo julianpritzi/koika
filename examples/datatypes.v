@@ -72,20 +72,20 @@ Definition _decr_icmp_ttl : action R empty_Sigma := <{
   let hdr := unpack(struct_t ipv4_header, read0(input)) in
   let valid := Ob~1 in
   match hdr.[protocol] with
-  | enum proto::< ICMP > => pass
-    (* let t := hdr.[ttl] in
+  | proto::<ICMP> =>
+    let t := hdr.[ttl] in
     if t == |8`d0| then
-      set valid := Ob~0
+      valid := Ob~0
     else
-      set hdr := subst(hdr, ttl, t - |8`d1|) *)
+      hdr := subst(hdr, ttl, t - |8`d1|)
       (* ← same as [put(hdr, ttl, t - 1)] *)
   return default: pass
   end;
-  (* set hdr := subst(hdr, reserved, enum flag::< unset >); (* reset the [reserved] field, just in case *)
-  write0(output, pack(struct response::{ valid := valid; value := hdr })) *)
+  hdr := subst(hdr, reserved, flag::<unset>); (* reset the [reserved] field, just in case *)
+  write0(output, pack(struct response::{ valid := valid; value := hdr }))
 }>.
 
-Definition _clear_checksum : uaction reg_t empty_ext_fn_t :=
+Definition _clear_checksum : action R empty_Sigma :=
   <{
       let presp := read1(output) in
       let phdr := getbits(response, presp, value) in
@@ -94,7 +94,7 @@ Definition _clear_checksum : uaction reg_t empty_ext_fn_t :=
   }>.
 
 Definition rules :=
-  tc_rules R empty_Sigma
+  (* tc_rules R empty_Sigma *)
            (fun rl => match rl with
                    | decr_icmp_ttl => _decr_icmp_ttl
                    | clear_checksum => _clear_checksum

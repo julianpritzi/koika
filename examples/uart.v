@@ -73,49 +73,49 @@ Module UART.
     | ext_write_bit => {$ bits_t 1 ~> bits_t 1 $}
     end.
 
-    Definition _read_input : action R Sigma := <{
-      let opt := struct Maybe::{ valid := Ob~0 } in
-      if Ob~1 && opt.[valid] then pass
+  Definition _read_input' : action R Sigma := <{
+    let opt := struct (@Maybe unit_t)::{ valid := 0b"0" } in
+    if Ob~1 && opt.[valid] then pass
   }>.
   Definition _read_input : action R Sigma := <{
-        let ready := read1(state) == enum tx_state::<idle> in
-        let opt_byte := extcall ext_read_byte(ready) in
-        (when ready && opt_byte.[valid] do
-           write1(in_byte, get(opt_byte, data));
-           write1(state, enum tx_state::<start>))
-    }>.
+    let ready := read1(state) == tx_state::<idle> in
+    let opt_byte := extcall ext_read_byte(ready) in
+    if ready && opt_byte.[valid] then (
+      write1(in_byte, opt_byte.[data]);
+      write1(state, tx_state::<start>)
+    )
+  }>.
 
-  Definition _transmit : uaction reg_t ext_fn_t :=
-    {{
-        let bit := read0(out_bit) in
-        let state := read0(state) in
-        (if read0(delay) == |CLOCK_DELAY_BITS`d0| then
-          match state with
-          | enum tx_state { start } =>
-            (set bit := Ob~0;
-             set state := enum tx_state { tx })
-          | enum tx_state { tx } =>
-            let bits := read0(in_byte) in
-            let offset := read0(in_byte_offset) in
-            let last_char := offset == Ob~1~1~1 in
-            set bit := bits[Ob~0~0~0];
-            write0(in_byte, bits >> Ob~1);
-            write0(in_byte_offset, offset + Ob~0~0~1);
-            (when last_char do
-               set state := enum tx_state { finish })
-          | enum tx_state { finish } =>
-            (set bit := Ob~1;
-             set state := enum tx_state { idle })
-          return default: pass
-          end;
-          write0(delay, #CLOCK_DELAY)
-        else
-          write0(delay, read0(delay) - |CLOCK_DELAY_BITS`d1|));
-        write0(out_bit, bit);
-        write0(state, state);
-        (* last_write_ack prevents the write from being optimized out *)
-        write0(last_write_ack, extcall ext_write_bit(bit))
-    }}.
+  Definition _transmit : action R Sigma := <{
+    let bit := read0(out_bit) in
+    let state := read0(state) in
+    if read0(delay) == |CLOCK_DELAY_BITS`d0| then (
+      match state with
+      | tx_state::<start> =>
+        bit := Ob~0;
+        state := tx_state::<tx>
+      | tx_state::<tx> =>
+        let bits := read0(in_byte) in
+        let offset := read0(in_byte_offset) in
+        let last_char := offset == Ob~1~1~1 in
+        bit := bits[0b"000"];
+        write0(in_byte, bits >> Ob~1);
+        write0(in_byte_offset, offset + 0b"001");
+        if last_char then
+          state := tx_state::<finish>
+      | enum tx_state::<finish> =>
+        bit := Ob~1;
+        state := tx_state::<idle>
+      return default: pass
+      end;
+      write0(delay, #CLOCK_DELAY)
+    ) else
+      write0(delay, read0(delay) - |CLOCK_DELAY_BITS`d1|);
+    write0(out_bit, bit);
+    write0(state, state);
+    (* last_write_ack prevents the write from being optimized out *)
+    write0(last_write_ack, extcall ext_write_bit(bit))
+  }>.
 
   Definition uart : scheduler :=
     transmit |> read_input |> done.
@@ -124,7 +124,7 @@ Module UART.
 
   (* Typechecking  *)
   Definition rules :=
-    tc_rules R Sigma
+    (* tc_rules R Sigma *)
              (fun r => match r with
                     | read_input => _read_input
                     | transmit => _transmit

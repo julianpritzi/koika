@@ -526,8 +526,6 @@ Coercion action_of_function {pos_t var_t} {fn_name_t} {reg_t ext_fn_t} {sig tau}
     {R : reg_t -> type} {Sigma: ext_fn_t -> ExternalSignature} :=
     @int_body fn_name_t (TypedSyntax.action pos_t var_t fn_name_t R Sigma sig tau).
 
-Print action_of_function.
-
 Definition test1 := (5 : bits_t 4).
 Definition test2 {var_t reg_t R REnv sig tau} := (5 : @a_exp var_t reg_t R REnv sig tau).
 
@@ -852,7 +850,7 @@ Section HoareFacts.
       {{ $P }} (Assign m exp) {{ $Q }}.
     Proof. solve_hoare. Qed.
 
-    Theorem hoare_seq  {sig tau} c1 (c2 : action sig tau) :
+    Theorem hoare_seq {sig tau} c1 (c2 : action sig tau) :
       ∀ P Q R,
       {{ $Q }} c2 {{ $R }} →
       {{ $P }} c1 {{ $Q }} →
@@ -1038,11 +1036,12 @@ Ltac hoare_step :=
 
 Ltac hoare_cleanup :=
   repeat match goal with
-  | |- context[TypedParsing.refine_sig_tau] => unfold TypedParsing.refine_sig_tau
+  | |- context[TypedParsing.delay_tau_uni] => unfold TypedParsing.delay_tau_uni
   | |- context[action_of_function ?f]          => progress change (action_of_function f) with (int_body f)
   | |- context[int_body {| int_body := ?b |}]  => progress change (int_body {| int_body := b |}) with b
   | |- context[a_exp_of_type _ _ _]            => progress change (a_exp_of_type ?t _ _) with t
   | H: context[a_exp_of_type _ _ _]       |- _ => progress change (a_exp_of_type ?t _ _ ) with t in H
+  (* TODO ret_assertion_of_assertion *)
   | |- context[@nat_to_type (bits_t _) _]      => progress change (@nat_to_type (bits_t ?sz) ?n) with (Bits.of_nat sz n)
   | H: context[@nat_to_type (bits_t _) _] |- _ => progress change (@nat_to_type (bits_t ?sz) ?n) with (Bits.of_nat sz n) in H
   | |- (fun _ => _) _ _ _ => hnf
@@ -1067,7 +1066,8 @@ Ltac hoare_cleanup :=
   | H: context[VarCtxMemberHd]   |- _ => unfold VarCtxMemberHd in H
   | |- context[VarCtxMemberTl]        => unfold VarCtxMemberTl
   | H: context[VarCtxMemberTl]   |- _ => unfold VarCtxMemberTl in H
-  | |- context[Hoare.var_ctx_member]        => unfold Hoare.var_ctx_member
+  | |- context[var_ref ?v ?s] =>  change (var_ref v s) with ltac:(let e := eval cbn in (var_ref v s) in exact e)
+    | |- context[Hoare.var_ctx_member]        => unfold Hoare.var_ctx_member
   | H: context[Hoare.var_ctx_member]   |- _ => unfold Hoare.var_ctx_member in H
   | |- context[Hoare.VarCtxMemberHd]        => unfold Hoare.VarCtxMemberHd
   | H: context[Hoare.VarCtxMemberHd]   |- _ => unfold Hoare.VarCtxMemberHd in H
@@ -1186,18 +1186,36 @@ Module HoareTest.
     cbn. lia.
   Qed.
 
-  (* Theorem add_8_self :
-    ∀ n REnv (env : REnv.(env_t) R) action_log scheduler_log ,
-    let Γ := (CtxCons ("a", bits_t 8) (Bits.of_nat 8 n)
-      (CtxCons ("b", bits_t 8) (Bits.of_nat 8 n) CtxEmpty)) in
-    match interp_action env empty_sigma Γ scheduler_log action_log (add 8) with
+  Theorem add_self :
+    ∀ sz n REnv (env : REnv.(env_t) R) action_log scheduler_log r l' Γ',
+    let Γ := (CtxCons ("a", bits_t sz) (Bits.of_nat sz n)
+      (CtxCons ("b", bits_t sz) (Bits.of_nat sz n) CtxEmpty)) in
+    interp_action env empty_sigma Γ scheduler_log action_log (add sz) = Some (l', r ,Γ') ->
+    r = Bits.of_nat _ (2*n).
+  Proof.
+    intros.
+    unfold add in H.
+    unfold action_of_function, int_body in *.
+    unfold TypedParsing.delay_tau_uni in *.
+    unfold interp_action, opt_bind, no_latest_writes in *.
+    repeat log_cleanup_step.
+    subst Γ.
+    cbn.
+    now rewrite Nat.add_0_r, Nat2Bits.inj_add.
+  Qed.
+
+  Theorem add_self' :
+    ∀ sz n REnv (env : REnv.(env_t) R) action_log scheduler_log ,
+    let Γ := (CtxCons ("a", bits_t sz) (Bits.of_nat sz n)
+      (CtxCons ("b", bits_t sz) (Bits.of_nat sz n) CtxEmpty)) in
+    match interp_action env empty_sigma Γ scheduler_log action_log (add sz) with
     | Some (_, r ,_) => r = Bits.of_nat _ (2*n)
     | None => False
     end.
   Proof.
     intros. cbn.
     now rewrite Nat.add_0_r, Nat2Bits.inj_add.
-  Qed. *)
+  Qed.
 
   (* Theorem double_correct :
     ∀ sz n REnv (env : REnv.(env_t) R) action_log scheduler_log ,
@@ -1259,6 +1277,7 @@ Module HoareTest.
     hoare.
     unfold BitFuns.lsl.
     vm_compute (Bits.to_nat _).
+    vm_compute (var_ref _ _).
     now rewrite H, <- Nat2Bits.inj_lsl_pow2, Nat.pow_1_r, Nat.mul_comm.
   Qed.
 
@@ -1274,14 +1293,14 @@ Module HoareTest.
     intros.
     hoare.
     hoare_apply double_correct.
-    rewrite H1, H, <- Nat2Bits.inj_add. reflexivity.
-
+    rewrite H1, H.
+    rewrite <- Nat2Bits.inj_add. reflexivity.
     hoare_cleanup.
     assumption.
   Qed.
   (* Print add_double_correct. *)
 
-  Theorem add_self :
+  Theorem add_self'' :
     ∀ sz n : nat,
     {{ Γ[a] = n /\ Γ[b] = n }} add sz {{ r, r = $(2*n) }}.
   Proof.
@@ -1342,6 +1361,8 @@ Module HoareTest.
     assumption.
     unfold BitFuns.lsr.
     vm_compute (Bits.to_nat _).
+    vm_compute (var_ref _ _).
+    hoare_cleanup.
     rewrite <- Nat2Bits.inj_lsr_pow2.
     rewrite Nat.mod_small.
     reflexivity.
@@ -1453,7 +1474,7 @@ Admitted. *)
   |}.
 
 
-  Fixpoint muxtree {sig tau} {sz} (bit_idx : nat) (k: var_t) {m : member (k, bits_t sz) sig} {bsz} (bodies: bits bsz -> action sig tau) :=
+  (* Fixpoint muxtree {sig tau} {sz} (bit_idx : nat) (k: var_t) {m : member (k, bits_t sz) sig} {bsz} (bodies: bits bsz -> action sig tau) :=
     match bsz return (bits bsz -> action sig tau) -> action sig tau with
     | 0 => fun bodies => bodies Ob
     | S n => fun bodies =>
@@ -1461,12 +1482,12 @@ Admitted. *)
       If (Binop (Bits2 (Sel _)) (Var m) (Const bit_idx))
          (muxtree (S bit_idx) k (fun bs => bodies bs~1) (m := m))
          (muxtree (S bit_idx) k (fun bs => bodies bs~0) (m := m))
-    end bodies.
+    end bodies. *)
 
-  Definition CompleteMuxTree {sig tau} {sz} (k: var_t) {m : member (k, bits_t sz) sig} (branches: bits sz -> action sig tau) :=
-    muxtree 0 k branches (m := m).
+  (* Definition CompleteMuxTree {sig tau} {sz} (k: var_t) {m : member (k, bits_t sz) sig} (branches: bits sz -> action sig tau) :=
+    muxtree 0 k branches (m := m). *)
 
-  Lemma mux_tree_size_bounded :
+  (* Lemma mux_tree_size_bounded :
     ∀ ext_meas sig tau sz k m b,
     ∃ n sz0, ∀ sz', sz' >= sz0 -> sz' = sz -> (* big O definition *)
     measure_action term_size ext_meas _ _ (@CompleteMuxTree sig tau sz k m b) < sz^2 *n.
@@ -1492,7 +1513,7 @@ Admitted. *)
         (* apply Nat.lt_succ_diag_r. *)
       (* simpl (0 ^ 2). *)
     (* cbn. *)
-  Admitted.
+  Admitted. *)
   End switching.
 
 End HoareTest.

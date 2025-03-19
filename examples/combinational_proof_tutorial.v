@@ -89,8 +89,8 @@ Since we are writing a combinational function, the design is parametric on the s
 The program above is *untyped*; we want to typecheck it; again, since we do not look at registers, we leave `reg_t` and `R` as parameters:
 |*)
 
-  Definition tc_design reg_t R :=
-    tc_function R empty_Sigma (design reg_t).
+  (* Definition tc_design reg_t R :=
+    tc_function R empty_Sigma (design reg_t). *)
 
 (*|
 .. note::
@@ -124,13 +124,14 @@ This is all that's needed to state a theorem.  We'll use Coq's “section” mec
 (*|
 For readability, let's define an abbreviation of the `interp_action` function.
 |*)
+  Require Import (coercions) Hoare.
 
     Definition run_design op input :=
       let design_inputs :=
           #{ ("op", bits_t 8) => op;
              ("input", bits_t 16) => input }# in
       CompactSemantics.interp_action
-        r empty_sigma design_inputs L l (tc_design reg_t R).
+        r empty_sigma design_inputs L l (design reg_t R).
 
 (*|
 (This is a good point to run a quick sanity check to make sure that our design passes simple smoke tests:)
@@ -212,17 +213,17 @@ Definition R r :=
   | output_data => bits_t sz
   end.
 
-Definition _runDesign : uaction _ _ :=
-  {{
+Definition _runDesign : action R empty_Sigma :=
+  <{
      let op := read0(input_op) in
      let input := read0(input_data) in
-     write0(output_data, {design reg_t}(op, input))
-  }}.
+     write0(output_data, {design reg_t R}(op, input))
+  }>.
 
 Inductive rule_name_t := runDesign.
 
-Definition rules : rule_name_t -> rule R empty_Sigma :=
-  tc_rules R empty_Sigma
+Definition rules : rule_name_t -> rule _ _ _ R empty_Sigma :=
+  (* tc_rules R empty_Sigma *)
            (fun rl => match rl with
                    | runDesign => _runDesign
                    end).
@@ -242,7 +243,7 @@ Definition r : ContextEnv.(env_t) R :=
 
 Definition package :=
   {| ip_koika := {| koika_reg_types := R;
-                   koika_reg_init reg := r.[reg];
+                   koika_reg_init reg := r?[reg];
                    koika_ext_fn_types := empty_Sigma;
                    koika_rules := rules;
                    koika_rule_external _ := false;

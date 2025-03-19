@@ -179,24 +179,6 @@ Section Syntax.
         - apply (Hargs Ha).
   Qed.
 
-  Definition add (n1 n2 : nat) : nat.
-    induction n1.
-    - exact n2.
-    - exact (S IHn1).
-  Defined.
-
-  (* Print add. *)
-
-
-  Goal forall n1 n2, add n1 n2 = Nat.add n1 n2.
-    induction n1.
-    reflexivity.
-    intros.
-    simpl (S n1 + _).
-    rewrite <- IHn1.
-    reflexivity.
-  Qed.
-
   Definition action_rect_complete
     (* Propositions *)
     (P : forall {sig tau}, action sig tau -> Type)
@@ -298,8 +280,6 @@ Section Syntax.
     (P : forall sig tau, action sig tau -> Set)
     (P' : forall sig argspec, acontext sig argspec -> Set) :=
     action_rect_complete P P'.
-
-  (* Print action_rect_complete. *)
 
   Definition rule := action nil unit_t.
 End Syntax.

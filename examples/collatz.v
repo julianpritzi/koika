@@ -23,28 +23,29 @@ Module Collatz.
     | r0 => Bits.of_nat sz 18
     end.
 
-  Definition times_three : function R empty_Sigma :=
-    <{ fun times_three (bs: bits_t 16) : bits_t 16 =>
-         (bs << Ob~1) + bs }>.
+  Definition times_three : function R empty_Sigma := <{
+    fun times_three (bs: bits_t 16) : bits_t 16 =>
+      (bs << Ob~1) + bs
+  }>.
 
   (*! Our first rule, ``divide``, reads from r0 and halves the result if it's even: !*)
-  Program Definition _divide : action R empty_Sigma :=
-    <{ let v := read0(r0) in
-       let odd := v[Ob~0~0~0~0] in
-       if !odd then
-         write0(r0,v >> Ob~1)
-       else
-         fail }>.
+  Definition _divide : action R empty_Sigma := <{
+    let v := read0(r0) in
+    let odd := v[Ob~0~0~0~0] in
+    if !odd then
+      write0(r0,v >> Ob~1)
+    else fail
+  }>.
 
   (*! Our second rule, ``multiply``, reads the output of ``divide`` and
       multiplies it by three and ads one if it is odd: !*)
-  Program Definition _multiply : action R empty_Sigma :=
-    <{ let v := read1(r0) in
-       let odd := v[Ob~0~0~0~0] in
-       if odd then
-         write1(r0, times_three(v) + Ob~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~1)
-       else
-         fail }>.
+  Definition _multiply : action R empty_Sigma := <{
+    let v := read1(r0) in
+    let odd := v[Ob~0~0~0~0] in
+    if odd then
+      write1(r0, times_three(v) + Ob~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~1)
+    else fail
+  }>.
 
   (*! The design's schedule defines the order in which rules should (appear to) run !*)
   Definition collatz : scheduler :=
@@ -142,7 +143,7 @@ Module Collatz_Test.
   Goal
     run_action r (rules divide)
     (fun ctxt =>
-      let bits_r0 := ctxt.[r0] in
+      let bits_r0 := ctxt?[r0] in
       Bits.to_nat bits_r0 = 9
     ).
   Proof.
@@ -165,7 +166,7 @@ Module Collatz_Test.
 
     run_function r input func.(int_body)
     (fun ctxt out =>
-      let r0 := Bits.to_nat ctxt.[r0] in
+      let r0 := Bits.to_nat ctxt?[r0] in
       let out  := Bits.to_nat out in
 
       (*
@@ -185,7 +186,7 @@ Module Collatz_Test.
   Goal
     run_schedule r rules empty_sigma collatz
     (fun ctxt =>
-      let bits_r0 := ctxt.[r0]           in
+      let bits_r0 := ctxt?[r0]           in
       let nat_r0  := Bits.to_nat bits_r0 in
 
       nat_r0 = (18/2)*3+1

@@ -69,6 +69,7 @@ Module Queue (QP : QueueParam).
     {{ env[empty] = 0 /\ Γ[a] = n}} (<{ enqueue0(a) }> : action' _ _ (sig := [("a", T)])) {{ False }}.
   Proof.
     intros.
+    unfold delay_tau.
     hoare_step.
     hoare_step.
     eapply hoare_args_weaken_pre.
@@ -79,12 +80,12 @@ Module Queue (QP : QueueParam).
     hoare_step.
     hoare.
     apply (hoare_read (R := R) _ empty).
-    hoare_cleanup. rewrite H.
+    hoare_cleanup. cbn. unfold ret_assertion_of_assertion. rewrite H.
     cbn.
     trivial.
   Qed.
 
-  Theorem queue_enc_correct :
+  Theorem queue_enq_correct :
     ∀ n: nat,
     {{ env[empty] = 1 /\ Γ[a] = n }} (<{ enqueue0(a) }> : action' R empty_Sigma (sig := [("a", T)])) {{ env[data] = n /\ env[empty] = 0 }}.
   Proof.
@@ -93,15 +94,17 @@ Module Queue (QP : QueueParam).
     hoare.
     apply (hoare_read (R := R) _ empty).
     hoare_cleanup.
-    rewrite H.
-    hnf.
+    unfold ret_assertion_of_assertion.
+
     rewrite get_put_eq.
     let e := eval cbn in (eq_dec data empty) in
     match e with
     | right ?Hneq => rewrite (get_put_neq _ _ _ _ _ Hneq)
     end.
     rewrite get_put_eq.
+    vm_compute (var_ref _ _).
     hoare_cleanup.
+    rewrite H.
     split. assumption. reflexivity.
   Qed.
 
@@ -115,12 +118,12 @@ Module Queue (QP : QueueParam).
     apply (hoare_read (R := R) _ data).
     apply (hoare_read (R := R) _ empty).
     hoare_cleanup.
-    rewrite H0.
-    hnf.
+    unfold ret_assertion_of_assertion.
     let e := eval cbn in (eq_dec empty data) in
     match e with
     | right ?Hneq => rewrite (get_put_neq _ _ _ _ _ Hneq)
     end.
+    rewrite H0.
     assumption.
   Qed.
 
@@ -137,67 +140,7 @@ Module Queue (QP : QueueParam).
     intros.
     eapply hoare_seq.
     - apply queue_deq_correct.
-    - apply queue_enc_correct.
-  Qed.
-
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    eapply hoare_args_weaken_pre.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    unfold enqueue0, action_of_function, int_body, TypedParsing.refine_sig_tau.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    eapply (hoare_read (R := R) _ empty).
-    with_strategy opaque [ cassoc ] cbn.
-    destruct H.
-    rewrite H.
-    with_strategy opaque [ cassoc ] cbn.
-
-    unfold TypedParsing.refine_sig_tau.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    eapply (hoare_read (R := R) _ data).
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    hoare_step.
-    eapply (hoare_read (R := R) _ empty).
-    with_strategy opaque [ cassoc ] cbn.
-
-    let e := eval cbn in (eq_dec data empty) in
-    match e with
-    | right ?Hneq => rewrite (get_put_neq _ _ _ _ _ Hneq)
-    end.
-    rewrite get_put_eq.
-    hoare_cleanup.
-    rewrite H0.
-    cbn.
-    unfold ret_assertion_of_assertion.
-    let e := eval cbn in (eq_dec empty data) in
-    match e with
-    | right ?Hneq => rewrite (get_put_neq _ _ _ _ _ Hneq)
-    | left ?Heq => rewrite (get_put_eq _ _ _ _)
-    end.
-    rewrite get_put_eq.
-    reflexivity.
+    - apply queue_enq_correct.
   Qed.
 End Queue.
 
@@ -209,13 +152,15 @@ End QueueParam'.
 Module Queue' (QP : QueueParam').
   Import QP.
 
-  Inductive reg_t := empty | data (idx: Vect.index sz).
-  Axiom reg_t_ft : FiniteType reg_t.
+  (* TODO extend to real queue *)
+  (* Inductive reg_t := empty | data (idx: Vect.index sz). *)
+  Inductive reg_t := empty | data.
+  (* Axiom reg_t_ft : FiniteType reg_t. *)
 
   Definition R reg :=
     match reg with
     | empty => bits_t 1
-    | data _ => T
+    | data => T
     end.
 
   Definition dequeue0: function R empty_Sigma :=
@@ -229,6 +174,8 @@ Module Queue' (QP : QueueParam').
   Definition dequeue1: function R empty_Sigma :=
     <{ fun dequeue1 () : T =>
          guard(!read1(empty)); write1(empty, Ob~1); read1(data) }>.
+
+End Queue'.
 
 Module QueueParam32 <: QueueParam.
   Definition T := bits_t 32.
