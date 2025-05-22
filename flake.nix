@@ -4,7 +4,9 @@
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";
     makes.url = "github:fluidattacks/makes/24.02";
-    nixpkgs.url = "github:nixos/nixpkgs/release-24.05";
+    # nixpkgs.url = "github:nixos/nixpkgs/release-24.05";
+    nixpkgs.url = "github:NixOS/nixpkgs?rev=4316480afd67ac44699314c127fdce2dea1d9937";
+
   };
 
   outputs = { self, flake-parts, makes, nixpkgs, ... } @ inputs:
