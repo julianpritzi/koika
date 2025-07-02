@@ -4,7 +4,8 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     makes.url = "github:fluidattacks/makes/24.02";
-    nixpkgs.url = "github:nixos/nixpkgs/release-24.05";
+    # nixpkgs.url = "github:nixos/nixpkgs/release-24.05";
+    nixpkgs.url = "github:NixOS/nixpkgs?rev=4316480afd67ac44699314c127fdce2dea1d9937";
 
     # unicoq.url = "git+file:///home/samxamnam/Projects/unicoq?ref=flake";
   };
