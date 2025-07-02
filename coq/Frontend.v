@@ -225,6 +225,16 @@ Ltac _tc_rules R Sigma uactions :=
   let res := constr:(fun r: rule_name_t =>
                       ltac:(destruct r eqn:? ;
                             lazymatch goal with
+                            | [ H: _ = ?r1 ?r2 ?r3 |- _ ] =>
+                              fail "Rule" r1 r2 r3 "contains too many arguments"
+                            | [ H: _ = ?r1 ?r2 |- _ ] =>
+                              destruct r2 eqn:?;
+                              lazymatch goal with
+                                | [ H: _ = ?rr2 |- _ ] =>
+                                  let ua := constr:(uactions rr2) in
+                                  let ua := (eval hnf in ua) in
+                                  (_tc_action R Sigma (@List.nil (var_t * type)) constr:(unit_t) ua)
+                              end
                             | [ H: _ = ?rr |- _ ] =>
                               (* FIXME: why does the ‘<:’ above need this hnf? *)
                               let ua := constr:(uactions rr) in
